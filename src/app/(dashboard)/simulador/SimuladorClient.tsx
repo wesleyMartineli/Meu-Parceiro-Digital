@@ -1110,7 +1110,7 @@ export default function SimuladorClient({
       console.error("Erro ao gerar proposta:", e);
       setFeedback({
         success: false,
-        message: `Erro ao gerar proposta: ${e.message || "Erro interno"}`,
+        message: `Erro detalhado: ${e.message} \n ${e.stack || ''}`,
       });
     } finally {
       setIsGeneratingPDF(false);
