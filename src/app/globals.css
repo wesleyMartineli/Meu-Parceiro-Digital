@@ -1,0 +1,125 @@
+@import "tailwindcss";
+
+:root {
+  --background: #E0E5CF;
+  --foreground: #00441F;
+}
+
+@theme {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-montserrat), sans-serif;
+  --font-mono: var(--font-geist-mono), monospace;
+
+  /* ═══ RODOBENS — Manual Oficial da Marca ═══ */
+  
+  /* Primary (Verde-escuro) — Pantone 3425C */
+  --color-rodobens-dark: #00441F;
+  --color-rodobens-dark-hover: #003318;
+
+  /* Accent (Verde-vivo) — Pantone 7480C */
+  --color-rodobens-vivid: #00CF7B;
+  --color-rodobens-vivid-hover: #00B86D;
+
+  /* Surface (Verde-claro) — Pantone 2274C */
+  --color-rodobens-light: #E0E5CF;
+
+  /* Hover / Transição (Laranja) — Pantone 1575C */
+  --color-rodobens-orange: #FF7A40;
+
+  /* Hover / Transição (Azul) — Pantone 2192C */
+  --color-rodobens-blue: #00A8E2;
+
+  --font-montserrat: var(--font-montserrat), sans-serif;
+
+  /* Design System Surfaces */
+  --color-surface: #E0E5CF;
+  --color-surface-dim: #d4d8cc;
+  --color-surface-bright: #E0E5CF;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #f2f4ee;
+  --color-surface-container: #ecefe6;
+  --color-surface-container-high: #e6e9e0;
+  --color-surface-container-highest: #E0E5CF;
+  --color-on-surface: #00441F;
+  --color-on-surface-variant: #3a5a42;
+  --color-inverse-surface: #1a2e22;
+  --color-inverse-on-surface: #f0f3ed;
+  --color-outline: #5C6B5F;
+  --color-outline-variant: #E0E5CF;
+  --color-surface-tint: #00441F;
+
+  /* Primary */
+  --color-primary: #00441F;
+  --color-on-primary: #ffffff;
+  --color-primary-container: #00CF7B;
+  --color-on-primary-container: #00331A;
+  --color-inverse-primary: #6BE8A8;
+
+  /* Secondary */
+  --color-secondary: #5C6B5F;
+  --color-on-secondary: #ffffff;
+  --color-secondary-container: #E0E5CF;
+  --color-on-secondary-container: #4A5A4D;
+
+  /* Tertiary */
+  --color-tertiary: #4A6B5A;
+  --color-on-tertiary: #ffffff;
+  --color-tertiary-container: #96B8A5;
+  --color-on-tertiary-container: #2A4A3A;
+
+  /* Error (preservado) */
+  --color-error: #ba1a1a;
+  --color-on-error: #ffffff;
+  --color-error-container: #ffdad6;
+  --color-on-error-container: #93000a;
+
+  /* Fixed Colors */
+  --color-primary-fixed: #c8f5d8;
+  --color-primary-fixed-dim: #6BE8A8;
+  --color-on-primary-fixed: #00200E;
+  --color-on-primary-fixed-variant: #003318;
+  --color-secondary-fixed: #e3e7da;
+  --color-secondary-fixed-dim: #c7ccbe;
+  --color-on-secondary-fixed: #1a1f1a;
+  --color-on-secondary-fixed-variant: #464b46;
+  --color-tertiary-fixed: #dce8e0;
+  --color-tertiary-fixed-dim: #c0d4c8;
+  --color-on-tertiary-fixed: #152720;
+  --color-on-tertiary-fixed-variant: #3a5a48;
+
+  /* Background */
+  --color-background-ds: #E0E5CF;
+  --color-on-background-ds: #00441F;
+  --color-surface-variant: #E0E5CF;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0f0a;
+    --foreground: #e0f0e6;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-montserrat), sans-serif;
+}
+
+::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #f2f4ee;
+  border-radius: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: #00CF7B;
+  border-radius: 8px;
+  border: 2px solid #f2f4ee;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #00441F;
+}
