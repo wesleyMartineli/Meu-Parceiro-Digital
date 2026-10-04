@@ -271,7 +271,7 @@ export default function MultiCotasClient({ leads, administradoras, empresa, usua
 
     const leadObj = leads?.find((l) => l.id === leadId);
     const basePath = typeof window !== 'undefined' ? window.location.origin : '';
-    const capaBgUrl = basePath + getDynamicCoverImage(produto, resultadoConsolidado?.totalCreditoBruto || 0);
+    const capaBgUrl = basePath + encodeURI(getDynamicCoverImage(produto, resultadoConsolidado?.totalCreditoBruto || 0));
 
     const activeAdmin = administradoras.find((a) => a.id === administradoraId);
 

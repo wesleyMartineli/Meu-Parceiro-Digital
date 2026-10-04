@@ -182,7 +182,7 @@ export default function EstudoOperacoesClient({
       return '/images/propostas/Capa Proposta/Capa Consorcio Imoveis.png';
     };
     const basePath = typeof window !== 'undefined' ? window.location.origin : '';
-    const capaBgUrl = basePath + getCoverImage(produto);
+    const capaBgUrl = basePath + encodeURI(getCoverImage(produto));
 
     const pdfData = {
       leadNome,

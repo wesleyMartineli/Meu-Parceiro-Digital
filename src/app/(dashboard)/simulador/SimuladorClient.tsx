@@ -990,7 +990,7 @@ export default function SimuladorClient({
 
       const leadObj = leads?.find((l) => l.id === leadId);
       const basePath = typeof window !== 'undefined' ? window.location.origin : '';
-      const capaBgUrl = basePath + getDynamicCoverImage(produto);
+      const capaBgUrl = basePath + encodeURI(getDynamicCoverImage(produto));
 
     const isRodobensPDF = engineKey === "rodobens";
     let ofertaAtualPdf = 0;
