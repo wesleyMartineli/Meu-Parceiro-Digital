@@ -38,7 +38,7 @@ export default function ProspectarClient({ userId, empresaId }: ProspectarClient
   const [errorMsg, setErrorMsg] = useState('');
   const [mapeados, setMapeados] = useState<Set<number>>(new Set());
   const [mapping, setMapping] = useState<Set<number>>(new Set());
-  const API_URL = process.env.NEXT_PUBLIC_PROSPECTA_API_URL || 'http://localhost:8000/api/scrape';
+  const API_URL = process.env.NEXT_PUBLIC_PROSPECTA_API_URL || 'https://prospect-main.onrender.com/api/scrape';
 
   const handleMapLead = async (lead: LeadResult, index: number) => {
     setMapping(prev => new Set(prev).add(index));
@@ -111,7 +111,7 @@ export default function ProspectarClient({ userId, empresaId }: ProspectarClient
           query,
           max_results: Number(maxResults),
           min_rating: Number(minRating),
-          headless: false
+          headless: true
         }),
       });
 
@@ -278,7 +278,7 @@ export default function ProspectarClient({ userId, empresaId }: ProspectarClient
             <div>
               <p className="font-semibold">Erro de Conexão</p>
               <p>{errorMsg}</p>
-              <p className="text-xs mt-1">Dica: O microserviço Python precisa estar rodando (uvicorn api:app --reload) na porta 8000.</p>
+              <p className="text-xs mt-1">Dica: O servidor no Render pode estar iniciando ou reiniciando. Aguarde alguns segundos e tente novamente.</p>
             </div>
           </div>
         )}
