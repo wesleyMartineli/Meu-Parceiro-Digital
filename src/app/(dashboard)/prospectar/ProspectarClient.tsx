@@ -38,7 +38,7 @@ export default function ProspectarClient({ userId, empresaId }: ProspectarClient
   const [errorMsg, setErrorMsg] = useState('');
   const [mapeados, setMapeados] = useState<Set<number>>(new Set());
   const [mapping, setMapping] = useState<Set<number>>(new Set());
-  const API_URL = '/api/prospectar';
+  const API_URL = 'https://prospect-main.onrender.com/api/scrape';
 
   const handleMapLead = async (lead: LeadResult, index: number) => {
     setMapping(prev => new Set(prev).add(index));
@@ -115,19 +115,19 @@ export default function ProspectarClient({ userId, empresaId }: ProspectarClient
         }),
       });
 
-      if (!response.ok) {
-        throw new Error('Falha na comunicação com o motor de busca.');
-      }
+      const data = await response.json().catch(() => null);
 
-      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data?.error || `Falha na comunicação (${response.status})`);
+      }
       
-      if (data.error) {
+      if (data?.error) {
         throw new Error(data.error);
       }
 
       setHasSearched(true);
 
-      if (data.leads && data.leads.length > 0) {
+      if (data?.leads && data.leads.length > 0) {
         setResults(data.leads);
         toast.success(`${data.leads.length} parceiros encontrados!`);
       } else {
