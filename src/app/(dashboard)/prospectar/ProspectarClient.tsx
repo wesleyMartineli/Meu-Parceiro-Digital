@@ -38,7 +38,7 @@ export default function ProspectarClient({ userId, empresaId }: ProspectarClient
   const [errorMsg, setErrorMsg] = useState('');
   const [mapeados, setMapeados] = useState<Set<number>>(new Set());
   const [mapping, setMapping] = useState<Set<number>>(new Set());
-  const API_URL = process.env.NEXT_PUBLIC_PROSPECTA_API_URL || 'https://prospect-main.onrender.com/api/scrape';
+  const API_URL = '/api/prospectar';
 
   const handleMapLead = async (lead: LeadResult, index: number) => {
     setMapping(prev => new Set(prev).add(index));
