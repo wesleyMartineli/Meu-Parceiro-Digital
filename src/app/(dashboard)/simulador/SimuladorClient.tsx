@@ -487,6 +487,7 @@ export default function SimuladorClient({
   
   const [isGeneratingPNG, setIsGeneratingPNG] = useState(false);
   const resultCardRef = useRef<HTMLDivElement>(null);
+  const exportCardRef = useRef<HTMLDivElement>(null);
 
   // ── Step 1: Administradora
   const [administradoraId, setAdministradoraId] = useState(() => {
@@ -1126,7 +1127,8 @@ export default function SimuladorClient({
       return;
     }
 
-    if (!resultCardRef.current) return;
+    const cardElement = exportCardRef.current || resultCardRef.current;
+    if (!cardElement) return;
 
     setIsGeneratingPNG(true);
     setFeedback({
@@ -1135,26 +1137,33 @@ export default function SimuladorClient({
     });
 
     try {
-      // 1. Capture as Blob
-      const blob = await toBlob(resultCardRef.current, { cacheBust: true, pixelRatio: 2 });
+      // 1. Capture as Blob com proporções fixas de desktop
+      const blob = await toBlob(cardElement, { cacheBust: true, pixelRatio: 2 });
       if (!blob) throw new Error("Erro ao gerar imagem");
 
       // 2. Copy to clipboard with Fallback
+      let copiedSuccessfully = false;
       try {
-        await navigator.clipboard.write([
-          new window.ClipboardItem({ 'image/png': blob })
-        ]);
-        setFeedback({ success: true, message: "✅ Proposta copiada para a área de transferência!" });
+        if (navigator.clipboard && window.ClipboardItem) {
+          await navigator.clipboard.write([
+            new window.ClipboardItem({ 'image/png': blob })
+          ]);
+          copiedSuccessfully = true;
+          setFeedback({ success: true, message: "✅ Proposta copiada para a área de transferência!" });
+        }
       } catch (clipboardErr) {
         console.warn("Falha no clipboard, fazendo download da imagem...", clipboardErr);
+      }
+
+      if (!copiedSuccessfully) {
         // Fallback: faz o download direto da imagem
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
-        link.download = `proposta-simplificada.png`;
+        link.download = `proposta-simplificada-${produto}.png`;
         link.href = url;
         link.click();
         URL.revokeObjectURL(url);
-        setFeedback({ success: true, message: "✅ Imagem salva no seu computador! (Cópia direta bloqueada pelo navegador)" });
+        setFeedback({ success: true, message: "✅ Imagem salva com sucesso! (Download direto realizado)" });
       }
 
       // 3. Upload to server asynchronously (do not block user)
@@ -1184,7 +1193,7 @@ export default function SimuladorClient({
       setIsGeneratingPNG(false);
       setIsPersonalizarModalOpen(false);
     }
-  }, [leadId, savedSimulacaoId, saveSimulacao, router]);
+  }, [leadId, savedSimulacaoId, saveSimulacao, produto, router]);
 
   // (Auxiliary calculations moved to top of component)
 
@@ -2255,6 +2264,215 @@ const leadObj = leads?.find((l) => l.id === leadId);
                             </div>
                           )
                         )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* ─── HIDDEN DESKTOP-LOCKED CARD FOR EXPORT / PNG GENERATION (Guarantees exact desktop proportions on mobile and PC) ─── */}
+                  <div
+                    aria-hidden="true"
+                    style={{
+                      position: 'fixed',
+                      left: '-9999px',
+                      top: '0px',
+                      width: '680px',
+                      zIndex: -9999,
+                      pointerEvents: 'none',
+                      opacity: 1,
+                    }}
+                  >
+                    <div
+                      ref={exportCardRef}
+                      className="bg-[#002E17] text-white rounded-3xl shadow-xl border border-zinc-800 flex flex-col relative overflow-hidden"
+                      style={{ width: '680px' }}
+                    >
+                      {/* Custom Header Image */}
+                      <div className="w-full relative overflow-hidden flex flex-col">
+                        <img 
+                          src="/images/header-proposta.png" 
+                          alt="Header Rodobens" 
+                          className="w-full h-auto object-cover -mt-10 scale-[1.04] origin-top"
+                        />
+                      </div>
+
+                      {/* Conteúdo com medidas fixas de desktop */}
+                      <div className="px-8 pb-8 pt-0 flex flex-col gap-4 relative -mt-4">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-[#00CF7B]/10 rounded-full blur-3xl pointer-events-none" />
+
+                        <div>
+                          <h3 className="text-2xl font-black tracking-tight mt-0.5 text-white">
+                            {getPropostaTitle(produto)}
+                          </h3>
+                        </div>
+
+                        {/* Grid 2 colunas fixas */}
+                        <div className="grid grid-cols-2 gap-x-8 gap-y-3.5">
+                          <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                            <span className="text-xs font-semibold opacity-80 text-gray-300">Modelo de Cálculo</span>
+                            <span className="text-base font-extrabold text-[#00CF7B]">
+                              {isRodobens
+                                ? MODALIDADES.find((m) => m.value === modalidade)?.label || "Linear"
+                                : modalidade === "reduzida" ? `Reduzida (${reducaoCustomizada}%)` : "Integral (100%)"}
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                            <span className="text-xs font-semibold opacity-80 text-gray-300">Total da Operação</span>
+                            <span className="text-base font-extrabold text-white">
+                              {formatPropostaCurrency(resultadoExibicao.creditoBruto)}
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                            <div className="flex flex-col">
+                              <span className="text-xs font-semibold opacity-80 text-gray-300">Prazo</span>
+                              <span className="text-base font-extrabold text-white">{prazo} meses</span>
+                            </div>
+                            <div className="flex flex-col text-right">
+                              <span className="text-xs font-semibold opacity-80 text-gray-300">Parcelas Furo</span>
+                              <span className="text-base font-extrabold text-white">{parcelasFuro || 0}</span>
+                            </div>
+                          </div>
+                          
+                          <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                            <div className="flex flex-col">
+                              <span className="text-xs font-semibold opacity-80 text-gray-300">Taxa Adm</span>
+                              <span className="text-base font-extrabold text-white">
+                                {temDescontoCampanha ? (
+                                  <>
+                                    <span className="line-through opacity-50 mr-2 text-sm">{taxaAdm}%</span>
+                                    <span className="text-green-400">{taxaAdmReal.toFixed(2)}%</span>
+                                  </>
+                                ) : (
+                                  `${taxaAdm}%`
+                                )}
+                              </span>
+                            </div>
+                            <div className="flex flex-col text-right">
+                              <span className="text-xs font-semibold opacity-80 text-gray-300">Seguro Prestamista</span>
+                              <span className="text-base font-extrabold text-white">{seguro}%</span>
+                            </div>
+                          </div>
+
+                          <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                            <div className="flex flex-col">
+                              <span className="text-xs font-semibold opacity-80 text-gray-300">
+                                Parcela Inicial {resultadoExibicao.parcelaPosAdesao ? '(c/ Adesão)' : ''}
+                              </span>
+                              <span className="text-base font-extrabold text-[#00CF7B]">
+                                {formatPropostaCurrency(resultadoExibicao.parcelaInicial)}
+                              </span>
+                            </div>
+                            <div className="flex flex-col text-right">
+                              <span className="text-xs font-semibold opacity-80 text-gray-300">Total Final Pago</span>
+                              <span className="text-base font-extrabold text-[#00CF7B]">
+                                {formatPropostaCurrency(resultadoExibicao.totalPago)}
+                              </span>
+                            </div>
+                          </div>
+
+                          {resultadoExibicao.parcelaPosAdesao && (
+                            <div className="flex justify-between items-center border-b border-white/5 pb-2 mt-2">
+                              <div className="flex flex-col">
+                                <span className="text-xs font-semibold opacity-80 text-gray-300">
+                                  Parcela após {prazoTaxaAdesao}x da adesão
+                                </span>
+                                <span className="text-base font-extrabold text-white">
+                                  {formatPropostaCurrency(resultadoExibicao.parcelaPosAdesao)}
+                                </span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-4 my-6">
+                          <div className="h-px bg-[#e9ebe4]/10 flex-1"></div>
+                          <span className="text-[10px] uppercase font-bold text-[#00CF7B] tracking-widest">
+                            {modalidade === 'pontual' ? 'Adiantamento Programado' : (tipoContemplacao === 'sorteio' ? 'Contemplação por Sorteio' : 'Oferta de Lance')}
+                          </span>
+                          <div className="h-px bg-[#e9ebe4]/10 flex-1"></div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-x-8 gap-y-3.5">
+                          {modalidade !== 'pontual' && tipoContemplacao === 'lance' && (
+                            <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                              <span className="text-xs font-semibold opacity-80 text-gray-300">Percentual Lance (Grupo)</span>
+                              <span className="text-base font-extrabold text-white">
+                                {resultadoExibicao.percentualLance.toFixed(2)}%
+                              </span>
+                            </div>
+                          )}
+
+                          <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                            <span className="text-xs font-semibold opacity-80 text-gray-300">Crédito Líquido</span>
+                            <span className="text-base font-extrabold text-white">
+                              {formatPropostaCurrency(resultadoExibicao.creditoLiquido)}
+                            </span>
+                          </div>
+                          
+                          {modalidade !== 'pontual' && (
+                            <>
+                              <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                                <span className="text-xs font-semibold opacity-80 text-gray-300">
+                                  {tipoContemplacao === 'sorteio' ? (resultadoExibicao.lanceTotalReais > 0 ? 'Pagamento Exigido no Sorteio (Furo)' : 'Pagamento na Contemplação') : 'Valor Total de Lance'}
+                                </span>
+                                <span className="text-base font-extrabold text-white">
+                                  {formatPropostaCurrency(resultadoExibicao.lanceTotalReais)}
+                                </span>
+                              </div>
+                              {tipoContemplacao === 'lance' && (
+                                <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                                  <span className="text-xs font-semibold opacity-80 text-gray-300">Embutido (Uso Cota)</span>
+                                  <span className="text-base font-extrabold text-white">
+                                    {lanceEmbutido}% ({formatPropostaCurrency(resultadoExibicao.lanceEmbutidoReais)})
+                                  </span>
+                                </div>
+                              )}
+                            </>
+                          )}
+
+                          {modalidade === 'pontual' ? (
+                            <div className="flex justify-between items-center border-b border-white/5 pb-2 col-span-2">
+                              <span className="text-xs font-semibold opacity-80 text-gray-300">Adiantamento Pontual (Mês {mesPontual})</span>
+                              <span className="text-base font-extrabold text-white">
+                                {formatPropostaCurrency((resultadoExibicao.adiantamento || 0) * quantidadeCotas)}
+                              </span>
+                            </div>
+                          ) : (
+                            tipoContemplacao === 'lance' && (
+                              <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                                <span className="text-xs font-semibold opacity-80 text-gray-300">Lance Recursos Próprios</span>
+                                <span className="text-base font-extrabold text-white">
+                                  {formatPropostaCurrency(resultadoExibicao.recursosPropriosReais)}
+                                </span>
+                              </div>
+                            )
+                          )}
+
+                          {modalidade !== 'pontual' && (
+                            resultadoExibicao.parcelaPosContemplacaoInicial ? (
+                              <div className="space-y-3 pt-1 col-span-2">
+                                <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                                  <span className="text-[11px] font-semibold opacity-80 text-gray-300">Parcela Pós-Contemplação (até {Math.ceil(prazo / 2)})</span>
+                                  <span className="text-base font-extrabold text-[#FF9025]">
+                                    {formatPropostaCurrency(resultadoExibicao.parcelaPosContemplacaoInicial)}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                  <span className="text-[11px] font-semibold opacity-80 text-gray-300">Parcela de {Math.ceil(prazo / 2) + 1} até {prazo}</span>
+                                  <span className="text-base font-extrabold text-[#FF9025]">
+                                    {formatPropostaCurrency(resultadoExibicao.parcelaFinal)}
+                                  </span>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="flex justify-between items-center pt-1 col-span-2">
+                                <span className="text-xs font-semibold opacity-80 text-gray-300">Parcela Pós-Contemplação</span>
+                                <span className="text-base font-extrabold text-[#FF9025]">
+                                  {formatPropostaCurrency(resultadoExibicao.parcelaFinal)}
+                                </span>
+                              </div>
+                            )
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
