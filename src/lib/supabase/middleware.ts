@@ -131,11 +131,9 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // 5. Bloqueio de rotas operacionais para Executivos
+  // 5. Bloqueio de rotas operacionais individuais para Executivos (mantém acesso ao CRM/Negócios)
   const isOperationalRoute =
-    request.nextUrl.pathname.startsWith('/propostas') ||
     request.nextUrl.pathname.startsWith('/simulador') ||
-    request.nextUrl.pathname.startsWith('/crm') ||
     request.nextUrl.pathname.startsWith('/tarefas') ||
     request.nextUrl.pathname.startsWith('/clientes');
 

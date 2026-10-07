@@ -52,17 +52,45 @@ export default async function LeadDetailPage({ params }: PageProps) {
 
   const leadData = lead as any;
 
-  // Se o usuário for gerente comum, ele só pode acessar os seus próprios leads
-  if (user.role === 'gerente_negocio' && leadData.vendedor_id !== user.id) {
-    redirect('/crm');
+  // Validação de acesso hierárquico ao Lead
+  const isMasterOrDirector =
+    user.role === 'master' ||
+    user.role === 'diretoria' ||
+    user.role === 'platform_admin';
+
+  if (!isMasterOrDirector) {
+    if (user.role === 'gerente_negocio' || user.role === 'ponto_venda') {
+      if (leadData.vendedor_id !== user.id) {
+        redirect('/crm');
+      }
+    } else if (user.role === 'superintendente' || user.role === 'regional') {
+      // Busca subordinados para checar se o lead pertence à equipe
+      const { data: todosUsuarios } = await supabase
+        .from('usuarios')
+        .select('id, supervisor_id')
+        .eq('ativo', true);
+
+      const getDescendantIds = (parentId: string, allUsers: any[]): string[] => {
+        const children = allUsers.filter((u) => u.supervisor_id === parentId);
+        let ids = children.map((c) => c.id);
+        for (const child of children) {
+          ids = ids.concat(getDescendantIds(child.id, allUsers));
+        }
+        return ids;
+      };
+
+      const allowedIds = [user.id, ...getDescendantIds(user.id, todosUsuarios || [])];
+      if (leadData.vendedor_id && !allowedIds.includes(leadData.vendedor_id)) {
+        redirect('/crm');
+      }
+    }
   }
 
   // 2. Busca gerentes da empresa
   const { data: gerentes } = await supabase
     .from('usuarios')
     .select('id, nome')
-    
-    .in('role', ['gerente_negocio', 'superintendente'])
+    .in('role', ['gerente_negocio', 'ponto_venda', 'regional', 'superintendente'])
     .order('nome', { ascending: true });
 
   // 3. Busca histórico de followups
