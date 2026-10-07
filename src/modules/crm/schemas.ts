@@ -46,7 +46,7 @@ export const updateNegocioStageSchema = z.object({
 export const updateParceiroStageSchema = z.object({
   leadId: leadIdSchema,
   newStage: z.enum(
-    ['mapeado', 'em_qualificacao', 'em_nomeacao', 'base_gerando_oportunidades', 'base_em_nutricao', 'base_sem_oportunidades', 'perdido'],
+    ['mapeado', 'em_qualificacao', 'em_nomeacao', 'base_gerando_oportunidades', 'base_em_nutricao', 'base_sem_oportunidades', 'perdido', 'inativo'],
     { message: 'Etapa inválida.' },
   ),
 });

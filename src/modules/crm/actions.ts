@@ -9,6 +9,7 @@ import {
   createLeadSchema,
   createNegocioManualSchema,
   leadIdSchema,
+  negocioIdSchema,
   toggleFollowupStatusSchema,
   updateLeadSchema,
   updateNegocioStageSchema,
@@ -632,10 +633,101 @@ export async function updateParceiroStageAction(
       return { success: false, message: 'Erro ao atualizar etapa do parceiro.' };
     }
 
+    // Se o parceiro foi migrado para inativo, exclui tudo o que ele movimentou de negócios e propostas
+    if (newStage === 'inativo') {
+      const { error: delNegociosError } = await (supabase as any)
+        .from('negocios_crm')
+        .delete()
+        .eq('cliente_id', leadId);
+
+      if (delNegociosError) {
+        console.error('Erro ao excluir negócios do parceiro inativo:', delNegociosError);
+      }
+
+      const { error: delPropostasError } = await (supabase as any)
+        .from('propostas')
+        .delete()
+        .eq('lead_id', leadId);
+
+      if (delPropostasError) {
+        console.error('Erro ao excluir propostas do parceiro inativo:', delPropostasError);
+      }
+    }
+
     revalidatePath('/clientes');
+    revalidatePath('/crm');
+    revalidatePath('/dashboard');
+    revalidatePath('/relatorios');
+    revalidatePath('/propostas');
     return { success: true, message: 'Etapa atualizada com sucesso.' };
   } catch (err: any) {
     console.error('Unhandled exception in updateParceiroStageAction:', err);
     return { success: false, message: 'Erro interno ao atualizar a etapa.' };
   }
 }
+
+/**
+ * Exclui ou cancela um negócio e remove a proposta vinculada, se houver.
+ */
+export async function deleteNegocioAction(
+  negocioId: string
+): Promise<CRMActionState> {
+  try {
+    const parsed = negocioIdSchema.safeParse(negocioId);
+    if (!parsed.success) {
+      return { success: false, message: parsed.error.issues[0].message };
+    }
+
+    const user = await getCurrentUser();
+    if (!user) {
+      return { success: false, message: 'Usuário não autenticado.' };
+    }
+
+    const supabase = await createClient();
+
+    // 1. Busca o negócio para obter proposta_id
+    const { data: negocio, error: fetchErr } = await (supabase as any)
+      .from('negocios_crm')
+      .select('id, proposta_id, vendedor_id, cliente_id')
+      .eq('id', negocioId)
+      .maybeSingle();
+
+    if (fetchErr || !negocio) {
+      return { success: false, message: 'Negócio não encontrado.' };
+    }
+
+    // 2. Exclui o negócio
+    const { error: delNegocioErr } = await (supabase as any)
+      .from('negocios_crm')
+      .delete()
+      .eq('id', negocioId);
+
+    if (delNegocioErr) {
+      console.error('Erro ao excluir negócio:', delNegocioErr);
+      return { success: false, message: 'Erro ao excluir negócio. Tente novamente.' };
+    }
+
+    // 3. Exclui proposta vinculada, se houver
+    if (negocio.proposta_id) {
+      const { error: delPropostaErr } = await (supabase as any)
+        .from('propostas')
+        .delete()
+        .eq('id', negocio.proposta_id);
+
+      if (delPropostaErr) {
+        console.error('Erro ao excluir proposta vinculada:', delPropostaErr);
+      }
+    }
+
+    revalidatePath('/crm');
+    revalidatePath('/clientes');
+    revalidatePath('/dashboard');
+    revalidatePath('/relatorios');
+    revalidatePath('/propostas');
+    return { success: true, message: 'Negócio excluído com sucesso!' };
+  } catch (err: any) {
+    console.error('Unhandled exception in deleteNegocioAction:', err);
+    return { success: false, message: `Erro interno: ${err?.message || 'Erro desconhecido'}` };
+  }
+}
+

@@ -85,11 +85,11 @@ export default async function ClientesPage() {
     let etapaCalculada = cliente.etapa_funil;
 
     // Fallback para Parceiros antigos que estão com a etapa errada (ex: sem_contato)
-    if (cliente.tipo_parceiro === 'lead' && !['mapeado', 'em_qualificacao', 'em_nomeacao', 'perdido'].includes(etapaCalculada)) {
+    if (cliente.tipo_parceiro === 'lead' && !['mapeado', 'em_qualificacao', 'em_nomeacao', 'perdido', 'inativo'].includes(etapaCalculada)) {
       etapaCalculada = 'mapeado';
     }
 
-    if (cliente.tipo_parceiro === 'base' && etapaCalculada !== 'perdido') {
+    if (cliente.tipo_parceiro === 'base' && etapaCalculada !== 'perdido' && etapaCalculada !== 'inativo') {
       if (valorTotal >= 100000) {
         etapaCalculada = 'base_gerando_oportunidades';
       } else if (valorTotal > 0) {

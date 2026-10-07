@@ -17,9 +17,10 @@ import {
   ChevronRight, 
   ChevronLeft,
   Briefcase,
-  ShieldCheck
+  ShieldCheck,
+  Trash2
 } from 'lucide-react';
-import { updateNegocioStageAction } from '@/modules/crm/actions';
+import { updateNegocioStageAction, deleteNegocioAction } from '@/modules/crm/actions';
 
 interface GerenteNegocio {
   id: string;
@@ -484,6 +485,20 @@ export default function MeusNegociosClient({
         alert(res.message);
       }
     });
+  };
+
+  const [isPendingDelete, startDeleteTransition] = useTransition();
+
+  const handleDeleteNegocio = (negocio: Negocio) => {
+    const confirmMsg = `Tem certeza que deseja cancelar/excluir o negócio "${negocio.titulo}"?\n\nEsta ação apagará o registro e removerá o valor de ${formatCurrency(negocio.credito)} dos seus resultados e do CRM.`;
+    if (window.confirm(confirmMsg)) {
+      startDeleteTransition(async () => {
+        const res = await deleteNegocioAction(negocio.id);
+        if (!res.success) {
+          alert(res.message);
+        }
+      });
+    }
   };
 
   return (
@@ -961,6 +976,14 @@ export default function MeusNegociosClient({
                             Ver Proposta
                           </Link>
                         )}
+                        <button
+                          onClick={() => handleDeleteNegocio(negocio)}
+                          disabled={isPendingDelete || isPendingMove}
+                          className="inline-flex items-center justify-center p-1.5 rounded-xl border border-red-200 bg-red-50 text-xs font-bold text-red-600 hover:bg-red-600 hover:text-white transition-colors shadow-xs cursor-pointer disabled:opacity-40"
+                          title="Cancelar / Excluir Negociação"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </td>
                     </tr>
                   ))
@@ -1054,22 +1077,30 @@ export default function MeusNegociosClient({
                           </div>
                         )}
 
-                        {/* Rodapé do Card: Links */}
-                        <div className="flex gap-2 pt-1">
+                        {/* Rodapé do Card: Links e Excluir */}
+                        <div className="flex gap-2 pt-1 items-center">
                           <Link
                             href={`/crm/${neg.cliente_id}`}
-                            className="flex-1 text-center py-1.5 rounded-lg border border-[#E0E5CF] text-[11px] font-bold text-[#00441F] hover:bg-gray-50 transition-colors"
+                            className="flex-1 text-center py-1.5 rounded-lg border border-[#E0E5CF] text-[11px] font-bold text-[#00441F] hover:bg-gray-50 transition-colors truncate"
                           >
                             Ver Parceiro
                           </Link>
                           {neg.proposta_id && (
                             <Link
                               href={`/propostas/${neg.proposta_id}`}
-                              className="flex-1 text-center py-1.5 rounded-lg bg-[#00CF7B] text-white text-[11px] font-bold hover:bg-[#00441F] transition-colors"
+                              className="flex-1 text-center py-1.5 rounded-lg bg-[#00CF7B] text-white text-[11px] font-bold hover:bg-[#00441F] transition-colors truncate"
                             >
                               Ver Proposta
                             </Link>
                           )}
+                          <button
+                            onClick={() => handleDeleteNegocio(neg)}
+                            disabled={isPendingDelete || isPendingMove}
+                            className="p-1.5 rounded-lg border border-red-200 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white transition-colors cursor-pointer disabled:opacity-40 shrink-0"
+                            title="Cancelar / Excluir Negociação"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         </div>
 
                         {/* Navegação Rápida de Etapa */}
