@@ -29,7 +29,7 @@ export default async function PropostasPage() {
       pdf_url,
       public_link,
       gerente:usuarios(nome),
-      lead:leads(nome),
+      lead:leads!inner(nome),
       simulacao:simulacoes(credito_total, produto, modalidade)
     `)
     ;

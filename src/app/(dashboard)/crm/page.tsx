@@ -110,7 +110,7 @@ export default async function CRMPage() {
       vendedor_id,
       created_at,
       updated_at,
-      leads (
+      leads!inner (
         id,
         nome,
         telefone
