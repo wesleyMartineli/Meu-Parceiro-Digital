@@ -178,20 +178,6 @@ export default function ProspectarClient({ userId, empresaId }: ProspectarClient
     document.body.removeChild(link);
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'SITE_OK':
-        return <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full font-medium">Site OK</span>;
-      case 'SEM_SITE':
-        return <span className="px-2 py-1 bg-gray-100 text-gray-800 text-xs rounded-full font-medium">Sem Site</span>;
-      case 'SITE_RUIM':
-        return <span className="px-2 py-1 bg-orange-100 text-orange-800 text-xs rounded-full font-medium">Site Ruim</span>;
-      case 'SITE_QUEBRADO':
-        return <span className="px-2 py-1 bg-red-100 text-red-800 text-xs rounded-full font-medium">Quebrado</span>;
-      default:
-        return <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full font-medium">{status}</span>;
-    }
-  };
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
@@ -304,7 +290,7 @@ export default function ProspectarClient({ userId, empresaId }: ProspectarClient
                   <th className="text-left py-4 px-6 text-xs font-semibold text-gray-500 uppercase tracking-wider">Empresa</th>
                   <th className="text-left py-4 px-6 text-xs font-semibold text-gray-500 uppercase tracking-wider">Avaliação</th>
                   <th className="text-left py-4 px-6 text-xs font-semibold text-gray-500 uppercase tracking-wider">Contato</th>
-                  <th className="text-left py-4 px-6 text-xs font-semibold text-gray-500 uppercase tracking-wider">Status Site</th>
+                  <th className="text-left py-4 px-6 text-xs font-semibold text-gray-500 uppercase tracking-wider">Site</th>
                   <th className="text-left py-4 px-6 text-xs font-semibold text-gray-500 uppercase tracking-wider">Endereço</th>
                   <th className="text-right py-4 px-6 text-xs font-semibold text-gray-500 uppercase tracking-wider">Ações</th>
                 </tr>
@@ -335,14 +321,21 @@ export default function ProspectarClient({ userId, empresaId }: ProspectarClient
                       <div className="text-xs text-gray-400 truncate max-w-[150px]">{lead.email || ''}</div>
                     </td>
                     <td className="py-4 px-6">
-                      <div className="flex flex-col gap-1 items-start">
-                        {getStatusBadge(lead.status)}
-                        {lead.site && (
-                          <a href={lead.site} target="_blank" rel="noreferrer" className="text-xs text-blue-600 hover:underline flex items-center gap-1 mt-1">
-                            <LinkIcon className="w-3 h-3" /> Abrir Site
-                          </a>
-                        )}
-                      </div>
+                      {lead.site ? (
+                        <a
+                          href={lead.site}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors text-xs font-semibold"
+                        >
+                          <LinkIcon className="w-3.5 h-3.5" />
+                          Abrir Site
+                        </a>
+                      ) : (
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium text-gray-400 bg-gray-100">
+                          Sem Site
+                        </span>
+                      )}
                     </td>
                     <td className="py-4 px-6">
                       <div className="flex items-start gap-2 text-sm text-gray-500">
