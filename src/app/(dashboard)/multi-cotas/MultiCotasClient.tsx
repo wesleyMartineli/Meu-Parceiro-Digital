@@ -75,6 +75,17 @@ export default function MultiCotasClient({ leads, administradoras, empresa, usua
   const [isPending, startTransition] = useTransition();
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [savedSimulacaoId, setSavedSimulacaoId] = useState<string | null>(null);
+  const uniqueLeads = useMemo(() => {
+    const seen = new Set<string>();
+    return leads.filter((l) => {
+      if (!l || !l.id) return false;
+      const key = (l.nome || '').trim().toLowerCase();
+      if (seen.has(l.id) || (key && seen.has(key))) return false;
+      seen.add(l.id);
+      if (key) seen.add(key);
+      return true;
+    });
+  }, [leads]);
 
   const [leadId, setLeadId] = useState('');
   const [administradoraId, setAdministradoraId] = useState(
@@ -389,7 +400,7 @@ export default function MultiCotasClient({ leads, administradoras, empresa, usua
               className="block w-full mt-1.5 rounded-lg border border-[#E0E5CF] bg-[#e9ebe4] px-3 py-2 text-sm text-[#00441F] outline-none focus:border-[#00CF7B]"
             >
               <option value="">Nenhum lead selecionado</option>
-              {leads.map((l) => (
+              {uniqueLeads.map((l) => (
                 <option key={l.id} value={l.id}>
                   {l.nome}
                 </option>

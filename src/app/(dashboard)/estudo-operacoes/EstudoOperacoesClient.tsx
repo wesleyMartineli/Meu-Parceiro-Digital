@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { calcularEstudoOperacoes, EstudoOperacoesResult } from '@/core/calculator/estudosEngine';
 import { SimulacaoInput, SimulacaoResult } from '@/core/calculator/types';
@@ -84,6 +84,18 @@ export default function EstudoOperacoesClient({
 
 
   // ─── Estado Global ──────────────────────────────────────────────────────
+  const uniqueLeads = useMemo(() => {
+    const seen = new Set<string>();
+    return leads.filter((l) => {
+      if (!l || !l.id) return false;
+      const key = (l.nome || '').trim().toLowerCase();
+      if (seen.has(l.id) || (key && seen.has(key))) return false;
+      seen.add(l.id);
+      if (key) seen.add(key);
+      return true;
+    });
+  }, [leads]);
+
   const [leadId, setLeadId] = useState('');
   const [produto, setProduto] = useState('imovel');
   const [dataInicio, setDataInicio] = useState<string>(() => {
@@ -402,7 +414,7 @@ export default function EstudoOperacoesClient({
             className="rounded-lg border border-[#E0E5CF] bg-[#e9ebe4] px-3 py-2 text-sm outline-none focus:border-[#00CF7B]"
           >
             <option value="">Nenhum lead</option>
-            {leads.map((l) => <option key={l.id} value={l.id}>{l.nome}</option>)}
+            {uniqueLeads.map((l) => <option key={l.id} value={l.id}>{l.nome}</option>)}
           </select>
           <select
             value={produto}

@@ -58,6 +58,7 @@ export default function ClientesClient({ clientes, gerentes, currentUser }: Clie
   const [viewMode, setViewMode] = useState<'table' | 'kanban'>('kanban');
   const [isPendingMove, startTransition] = useTransition();
   const [tipoParceiro, setTipoParceiro] = useState<'base' | 'lead'>('base');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [state, formAction, isPending] = useActionState(createLeadAction, initialState);
 
   // Filtros
@@ -389,14 +390,22 @@ export default function ClientesClient({ clientes, gerentes, currentUser }: Clie
 
             <form
               action={async (formData) => {
-                formData.append('tipo_parceiro', tipoParceiro);
-                const res = await createLeadAction(state, formData);
-                if (res.success) {
-                  setIsOpen(false);
-                  state.message = res.message;
-                  state.success = true;
-                } else {
-                  alert(res.message);
+                if (isSubmitting) return;
+                setIsSubmitting(true);
+                try {
+                  formData.append('tipo_parceiro', tipoParceiro);
+                  const res = await createLeadAction(state, formData);
+                  if (res.success) {
+                    setIsOpen(false);
+                    state.message = res.message;
+                    state.success = true;
+                  } else {
+                    alert(res.message);
+                  }
+                } catch (err: any) {
+                  alert(err?.message || 'Erro ao salvar parceiro');
+                } finally {
+                  setIsSubmitting(false);
                 }
               }}
               className="space-y-4"
@@ -493,10 +502,10 @@ export default function ClientesClient({ clientes, gerentes, currentUser }: Clie
                 </button>
                 <button
                   type="submit"
-                  disabled={isPending}
+                  disabled={isSubmitting || isPending}
                   className="px-4 py-2 rounded-xl bg-[#00CF7B] hover:bg-[#FF7A40] text-sm font-bold text-white disabled:opacity-50 transition-all cursor-pointer"
                 >
-                  {isPending ? 'Gravando...' : 'Salvar Parceiro'}
+                  {isSubmitting || isPending ? 'Gravando...' : 'Salvar Parceiro'}
                 </button>
               </div>
             </form>

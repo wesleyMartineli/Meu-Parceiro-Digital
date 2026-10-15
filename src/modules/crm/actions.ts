@@ -15,6 +15,16 @@ import {
   updateNegocioStageSchema,
   updateParceiroStageSchema,
 } from './schemas';
+import {
+  generateCommercialRecommendations,
+  ExistingTask,
+  LeadData,
+  PropostaData,
+  NegocioCrmData,
+  CommercialRecommendation,
+  CapacityAnalysis,
+} from './recommendationEngine';
+import { parseCommercialIntent, buildAssistantResponse } from './intentParser';
 
 export type CRMActionState = {
   success: boolean;
@@ -142,6 +152,39 @@ export async function createLeadAction(
 
     if (!resolvedEmpresaId) {
       return { success: false, message: 'Erro: Não foi possível determinar a empresa (empresa_id) do usuário.' };
+    }
+
+    // Prevenção contra duplicidade de parceiros
+    const normalizedNome = nome.trim();
+    const { data: existingByName } = await (supabase as any)
+      .from('leads')
+      .select('id, nome')
+      .eq('empresa_id', resolvedEmpresaId)
+      .ilike('nome', normalizedNome)
+      .limit(1);
+
+    if (existingByName && existingByName.length > 0) {
+      return {
+        success: false,
+        message: `Já existe um parceiro cadastrado com o nome "${existingByName[0].nome}".`,
+      };
+    }
+
+    if (codigoPv && codigoPv.trim()) {
+      const normalizedPv = codigoPv.trim();
+      const { data: existingByPv } = await (supabase as any)
+        .from('leads')
+        .select('id, nome')
+        .eq('empresa_id', resolvedEmpresaId)
+        .eq('codigo_pv', normalizedPv)
+        .limit(1);
+
+      if (existingByPv && existingByPv.length > 0) {
+        return {
+          success: false,
+          message: `O código PV "${normalizedPv}" já está vinculado ao parceiro "${existingByPv[0].nome}".`,
+        };
+      }
     }
 
     const leadPayload = {
@@ -454,6 +497,52 @@ export async function toggleFollowupStatusAction(
 }
 
 /**
+ * Exclui uma tarefa / compromisso da agenda (followup)
+ */
+export async function deleteFollowupAction(
+  followupId: string,
+  leadId?: string
+): Promise<CRMActionState> {
+  try {
+    if (!followupId) {
+      return { success: false, message: 'ID do compromisso é obrigatório.' };
+    }
+
+    const user = await getCurrentUser();
+    if (!user) {
+      return { success: false, message: 'Usuário não autenticado.' };
+    }
+
+    const supabase = await createClient();
+
+    let query = (supabase as any)
+      .from('followups')
+      .delete()
+      .eq('id', followupId);
+
+    if (user.role === 'gerente_negocio') {
+      query = query.eq('vendedor_id', user.id);
+    }
+
+    const { error } = await query;
+
+    if (error) {
+      console.error('Erro ao excluir compromisso da agenda:', error);
+      return { success: false, message: 'Erro ao excluir compromisso. Tente novamente.' };
+    }
+
+    if (leadId) {
+      revalidatePath(`/crm/${leadId}`);
+    }
+    revalidatePath('/tarefas');
+    revalidatePath('/dashboard');
+    return { success: true, message: 'Compromisso excluído com sucesso!' };
+  } catch (err: any) {
+    return { success: false, message: `Erro interno: ${err?.message || 'Erro desconhecido'}` };
+  }
+}
+
+/**
  * Cria um negócio manualmente para um cliente existente.
  */
 export async function createNegocioManualAction(
@@ -730,4 +819,316 @@ export async function deleteNegocioAction(
     return { success: false, message: `Erro interno: ${err?.message || 'Erro desconhecido'}` };
   }
 }
+
+/**
+ * Criação direta de acompanhamento utilizada pelo Assistente Inteligente de Agenda.
+ */
+export async function createFollowupDirectAction(payload: {
+  leadId: string;
+  titulo: string;
+  descricao?: string | null;
+  dataFollowup: string;
+  tipo?: string;
+}): Promise<CRMActionState & { followup?: any }> {
+  try {
+    const user = await getCurrentUser();
+    if (!user) {
+      return { success: false, message: 'Usuário não autenticado.' };
+    }
+
+    const parsed = createFollowupSchema.safeParse({
+      leadId: payload.leadId,
+      titulo: payload.titulo,
+      descricao: payload.descricao,
+      dataFollowup: payload.dataFollowup,
+      tipo: payload.tipo,
+    });
+
+    if (!parsed.success) {
+      return { success: false, message: parsed.error.issues[0].message };
+    }
+
+    const { leadId, titulo, descricao, dataFollowup, tipo } = parsed.data;
+    const supabase = await createClient();
+
+    const leadValido = await leadPertenceAEmpresa(supabase, leadId, "");
+    if (!leadValido) {
+      return { success: false, message: 'Lead inválido para esta empresa.' };
+    }
+
+    const followupPayload = {
+      lead_id: leadId,
+      vendedor_id: user.id,
+      empresa_id: user.empresa_id || '43605699-aaf9-4caf-872a-2526e728ddd6',
+      titulo,
+      descricao: descricao || null,
+      data_followup: new Date(dataFollowup).toISOString(),
+      status: 'pendente',
+      tipo: tipo || 'outros',
+    };
+
+    const { data: newFollowup, error } = await (supabase as any)
+      .from('followups')
+      .insert(followupPayload)
+      .select('id, titulo, descricao, data_followup, status, tipo, created_at, leads(id, nome)')
+      .single();
+
+    if (error) {
+      console.error('Erro ao agendar acompanhamento via assistente:', error);
+      return { success: false, message: 'Erro ao agendar tarefa. Tente novamente.' };
+    }
+
+    revalidatePath(`/crm/${leadId}`);
+    revalidatePath(`/tarefas`);
+    revalidatePath(`/dashboard`);
+    return { success: true, message: 'Tarefa agendada com sucesso!', followup: newFollowup };
+  } catch (err: any) {
+    return { success: false, message: `Erro interno: ${err?.message || 'Erro desconhecido'}` };
+  }
+}
+
+/**
+ * Carrega a visão completa do Assistente Comercial (tarefas, propostas, parceiros e recomendações)
+ */
+export async function getCommercialAssistantOverviewAction(): Promise<{
+  success: boolean;
+  message?: string;
+  recommendations?: CommercialRecommendation[];
+  capacity?: CapacityAnalysis;
+  stats?: any;
+  briefing?: string;
+  leads?: LeadData[];
+}> {
+  try {
+    const user = await getCurrentUser();
+    if (!user) {
+      return { success: false, message: 'Usuário não autenticado.' };
+    }
+
+    const supabase = await createClient();
+
+    // 1. Tarefas existentes (followups)
+    let followupsQuery = supabase
+      .from('followups')
+      .select('id, titulo, descricao, data_followup, status, tipo, leads(id, nome)')
+      .order('data_followup', { ascending: true });
+
+    if (user.role === 'gerente_negocio') {
+      followupsQuery = followupsQuery.eq('vendedor_id', user.id);
+    }
+    const { data: followupsData } = await followupsQuery;
+
+    const existingTasks: ExistingTask[] = (followupsData || []).map((t: any) => ({
+      id: t.id,
+      titulo: t.titulo,
+      descricao: t.descricao,
+      data_followup: t.data_followup,
+      status: t.status,
+      tipo: t.tipo,
+      leads: t.leads ? { id: t.leads.id, nome: t.leads.nome } : undefined,
+    }));
+
+    // 2. Propostas comerciais
+    let propostasQuery = (supabase as any)
+      .from('propostas')
+      .select(`
+        id,
+        created_at,
+        status,
+        visualizacoes,
+        lead_id,
+        lead:leads(nome),
+        simulacao:simulacoes(credito_total, produto)
+      `)
+      .order('created_at', { ascending: false });
+
+    if (user.role === 'gerente_negocio') {
+      propostasQuery = propostasQuery.eq('vendedor_id', user.id);
+    }
+    const { data: propostasData } = await propostasQuery;
+
+    const propostas: PropostaData[] = (propostasData || []).map((p: any) => ({
+      id: p.id,
+      lead_id: p.lead_id,
+      lead_nome: p.lead?.nome,
+      status: p.status,
+      created_at: p.created_at,
+      visualizacoes: p.visualizacoes || 0,
+      credito_total: p.simulacao?.credito_total,
+      produto: p.simulacao?.produto,
+    }));
+
+    // 3. Leads / Parceiros da carteira com negócios e atividades agregados
+    let leadsQuery = supabase
+      .from('leads')
+      .select(`
+        id,
+        nome,
+        tipo_parceiro,
+        etapa_funil,
+        telefone,
+        cidade,
+        estado,
+        created_at,
+        updated_at,
+        negocios_crm (
+          id,
+          credito,
+          etapa_funil,
+          titulo
+        )
+      `)
+      .order('nome', { ascending: true });
+
+    if (user.role === 'gerente_negocio') {
+      leadsQuery = leadsQuery.eq('vendedor_id', user.id);
+    }
+    const { data: leadsData } = await leadsQuery;
+
+    const leads: LeadData[] = (leadsData || []).map((l: any) => {
+      const negs = l.negocios_crm || [];
+      const totalNegocios = negs.length;
+      const volumeCredito = negs.reduce((acc: number, n: any) => acc + (Number(n.credito) || 0), 0);
+      const totalTarefas = (followupsData || []).filter((t: any) => t.lead_id === l.id || t.leads?.id === l.id).length;
+      const totalPropostas = (propostasData || []).filter((p: any) => p.lead_id === l.id).length;
+      return {
+        id: l.id,
+        nome: l.nome,
+        tipo_parceiro: l.tipo_parceiro,
+        etapa_funil: l.etapa_funil,
+        telefone: l.telefone,
+        cidade: l.cidade,
+        estado: l.estado,
+        created_at: l.created_at,
+        updated_at: l.updated_at,
+        totalNegocios,
+        volumeCredito,
+        totalTarefas,
+        totalPropostas,
+      };
+    });
+
+    // 4. Negócios CRM
+    let crmQuery = (supabase as any)
+      .from('negocios_crm')
+      .select('id, cliente_id, titulo, credito, etapa_funil, proximo_followup, ultima_interacao, leads(id, nome, telefone)');
+
+    if (user.role === 'gerente_negocio') {
+      crmQuery = crmQuery.eq('vendedor_id', user.id);
+    }
+    const { data: crmData } = await crmQuery;
+
+    const engineResult = generateCommercialRecommendations({
+      existingTasks,
+      leads,
+      propostas,
+      negocios: crmData || [],
+      referenceDate: new Date(),
+      closingConfig: { startDayOfMonth: 24, enabled: true },
+    });
+
+    const briefingPayload = buildAssistantResponse(
+      { intent: 'PROACTIVE_BRIEFING', confidence: 1, matchedKeywords: [] },
+      engineResult.recommendations,
+      engineResult.capacitySummary,
+      engineResult.stats
+    );
+
+    return {
+      success: true,
+      recommendations: engineResult.recommendations,
+      capacity: engineResult.capacitySummary,
+      stats: engineResult.stats,
+      briefing: briefingPayload.messageText,
+      leads,
+    };
+  } catch (error: any) {
+    console.error('Erro ao gerar visão do assistente comercial:', error);
+    return { success: false, message: error?.message || 'Erro ao carregar dados comerciais.' };
+  }
+}
+
+/**
+ * Processa a pergunta do usuário para o assistente comercial
+ */
+export async function queryCommercialAssistantAction(userInput: string): Promise<{
+  success: boolean;
+  message?: string;
+  responsePayload?: {
+    messageText: string;
+    filteredRecommendations: CommercialRecommendation[];
+    actionPills: { label: string; query: string }[];
+  };
+}> {
+  try {
+    const overview = await getCommercialAssistantOverviewAction();
+    if (!overview.success || !overview.recommendations || !overview.capacity) {
+      return { success: false, message: overview.message || 'Erro ao processar consulta comercial.' };
+    }
+
+    const intent = parseCommercialIntent(userInput);
+
+    const responsePayload = buildAssistantResponse(
+      intent,
+      overview.recommendations,
+      overview.capacity,
+      overview.stats || {
+        totalPropostasParadas: 0,
+        totalParceirosInativos: 0,
+        totalOportunidadesCrm: 0,
+        diasBloqueadosSemana: 0,
+      },
+      (overview as any).leads || []
+    );
+
+    return {
+      success: true,
+      responsePayload,
+    };
+  } catch (err: any) {
+    return { success: false, message: err?.message || 'Erro ao consultar assistente.' };
+  }
+}
+
+/**
+ * Registra a interação do GN com uma recomendação (auditoria e métricas)
+ */
+export async function logAssistantRecommendationAction(payload: {
+  recommendationId: string;
+  action: 'aceitar' | 'rejeitar' | 'reagendar';
+  leadId?: string;
+  tipo?: string;
+  dataSugerida?: string;
+  motivo?: string;
+}): Promise<CRMActionState> {
+  try {
+    const user = await getCurrentUser();
+    if (!user) return { success: false, message: 'Não autenticado' };
+
+    // Tenta registrar na tabela audit_logs (já existente no sistema)
+    const supabase = await createClient();
+    try {
+      await (supabase as any).from('audit_logs').insert({
+        usuario_id: user.id,
+        acao: `assistente_recomendacao_${payload.action}`,
+        tabela: 'followups',
+        detalhes: {
+          recommendationId: payload.recommendationId,
+          leadId: payload.leadId,
+          tipo: payload.tipo,
+          dataSugerida: payload.dataSugerida,
+          motivo: payload.motivo,
+          timestamp: new Date().toISOString(),
+        },
+      });
+    } catch {
+      // Ignora silenciosamente caso audit_logs tenha schema restritivo
+    }
+
+    return { success: true, message: 'Interação registrada' };
+  } catch {
+    return { success: false, message: 'Erro ao registrar interação' };
+  }
+}
+
 

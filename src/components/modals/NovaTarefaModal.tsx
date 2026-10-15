@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useState, useEffect, useActionState } from 'react';
+import React, { useRef, useState, useEffect, useActionState, useMemo } from 'react';
 import { useFormStatus } from 'react-dom';
 import { createFollowupAction } from '@/modules/crm/actions';
 
@@ -37,7 +37,19 @@ export default function NovaTarefaModal({ isOpen, onClose, leads }: NovaTarefaMo
   const [selectedLead, setSelectedLead] = useState<LeadOption | null>(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
-  const filteredLeads = leads.filter(lead => 
+  const uniqueLeads = useMemo(() => {
+    const seen = new Set<string>();
+    return leads.filter((l) => {
+      if (!l || !l.id) return false;
+      const key = (l.nome || '').trim().toLowerCase();
+      if (seen.has(l.id) || (key && seen.has(key))) return false;
+      seen.add(l.id);
+      if (key) seen.add(key);
+      return true;
+    });
+  }, [leads]);
+
+  const filteredLeads = uniqueLeads.filter(lead => 
     lead.nome.toLowerCase().includes(searchTerm.toLowerCase())
   );
 

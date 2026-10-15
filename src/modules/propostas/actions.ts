@@ -77,7 +77,8 @@ export async function createPropostaAction(payload: {
 
     const ext = fileType === 'png' ? 'png' : 'pdf';
     const contentType = fileType === 'png' ? 'image/png' : 'application/pdf';
-    const fileName = `${null}/${simulacaoId}_${Date.now()}.${ext}`;
+    const folder = user.empresa_id || 'geral';
+    const fileName = `${folder}/${simulacaoId}_${Date.now()}.${ext}`;
 
     // 2. Upload para o Supabase Storage
     const { data: uploadData, error: uploadError } = await supabase.storage

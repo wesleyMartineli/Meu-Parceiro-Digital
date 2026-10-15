@@ -23,6 +23,7 @@ export default async function SimuladorPage() {
   let leadsQuery = (supabase as any)
     .from('leads')
     .select('id, nome')
+    .eq('empresa_id', empresaId)
     .or('tipo_parceiro.is.null,tipo_parceiro.eq.base');
 
   // Se for gerente comum, só vê seus próprios leads

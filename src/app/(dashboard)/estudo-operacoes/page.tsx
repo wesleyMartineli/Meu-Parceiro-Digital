@@ -23,7 +23,7 @@ export default async function EstudoOperacoesPage() {
   let leadsQuery = (supabase as any)
     .from('leads')
     .select('id, nome')
-    ;
+    .eq('empresa_id', empresaId);
 
   if (user.role === 'gerente_negocio') {
     leadsQuery = leadsQuery.eq('vendedor_id', user.id);

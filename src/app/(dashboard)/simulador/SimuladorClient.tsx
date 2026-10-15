@@ -508,6 +508,18 @@ export default function SimuladorClient({
   const isRodobens = engineKey === "rodobens";
 
   // ── Step 2: Lead & Produto
+  const uniqueLeads = useMemo(() => {
+    const seen = new Set<string>();
+    return leads.filter((l) => {
+      if (!l || !l.id) return false;
+      const key = (l.nome || '').trim().toLowerCase();
+      if (seen.has(l.id) || (key && seen.has(key))) return false;
+      seen.add(l.id);
+      if (key) seen.add(key);
+      return true;
+    });
+  }, [leads]);
+
   const [leadId, setLeadId] = useState("");
 
   useEffect(() => {
@@ -1166,22 +1178,51 @@ export default function SimuladorClient({
         setFeedback({ success: true, message: "✅ Imagem salva com sucesso! (Download direto realizado)" });
       }
 
-      // 3. Upload to server asynchronously (do not block user)
+      // 3. Salvar simulação e registrar proposta no CRM Pipeline
+      setFeedback({
+        success: true,
+        message: "⏳ Salvando simulação e registrando proposta no pipeline...",
+      });
+
       let simId = savedSimulacaoId;
       if (!simId) simId = await saveSimulacao();
       
       if (simId) {
-        const reader = new FileReader();
-        reader.readAsDataURL(blob);
-        reader.onloadend = async () => {
-          const base64data = reader.result as string;
-          await createPropostaAction({
-            leadId,
-            simulacaoId: simId,
-            pdfBase64: base64data,
-            fileType: 'png',
+        const base64data = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            if (typeof reader.result === 'string') {
+              resolve(reader.result);
+            } else {
+              reject(new Error("Falha ao converter imagem para base64"));
+            }
+          };
+          reader.onerror = () => reject(new Error("Erro ao ler imagem"));
+          reader.readAsDataURL(blob);
+        });
+
+        const res = await createPropostaAction({
+          leadId,
+          simulacaoId: simId,
+          pdfBase64: base64data,
+          fileType: 'png',
+        });
+
+        if (res.success) {
+          setFeedback({
+            success: true,
+            message: copiedSuccessfully
+              ? "✅ Proposta simplificada copiada e salva no pipeline com sucesso!"
+              : "✅ Imagem salva e proposta registrada no pipeline com sucesso!",
           });
-        };
+          router.refresh();
+        } else {
+          console.error("Erro ao registrar proposta da simplificada:", res.message);
+          setFeedback({
+            success: false,
+            message: `⚠️ Imagem gerada, mas erro ao salvar no pipeline: ${res.message}`,
+          });
+        }
       }
     } catch (e: any) {
       console.error("Erro ao copiar proposta PNG:", e);
@@ -1275,7 +1316,7 @@ const leadObj = leads?.find((l) => l.id === leadId);
                   className="block w-full rounded-xl border border-[#E0E5CF] bg-[#e9ebe4] px-3 py-2.5 text-sm text-[#002E17] outline-none focus:border-[#00CF7B] focus:ring-2 focus:ring-[#00CF7B]/10 transition-all cursor-pointer"
                 >
                   <option value="">Nenhum parceiro selecionado</option>
-                  {leads.map((l) => (
+                  {uniqueLeads.map((l) => (
                     <option key={l.id} value={l.id}>
                       {l.nome}
                     </option>

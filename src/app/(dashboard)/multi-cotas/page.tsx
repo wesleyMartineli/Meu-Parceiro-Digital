@@ -23,7 +23,7 @@ export default async function MultiCotasPage() {
   let leadsQuery = (supabase as any)
     .from('leads')
     .select('id, nome')
-    ;
+    .eq('empresa_id', empresaId);
 
   // Se for gerente comum, só vê seus próprios leads
   if (user.role === 'gerente_negocio') {
