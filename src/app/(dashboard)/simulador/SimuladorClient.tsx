@@ -896,6 +896,7 @@ export default function SimuladorClient({
       prazoMaxGrupo: isRodobens ? prazoMaxGrupo : undefined,
       parcelasFuro: isRodobens ? parcelasFuro : undefined,
       diluirFuro: isRodobens ? diluirFuro : undefined,
+      tipoContemplacao,
       taxaAdesao: engineKey === "portobank" ? taxaAdesao : undefined,
       prazoTaxaAdesao: engineKey === "portobank" ? prazoTaxaAdesao : undefined,
       quantidadeCotas,
@@ -1036,6 +1037,11 @@ export default function SimuladorClient({
       produto: produto,
       modalidade: modalidade,
       prazo: prazo,
+      prazoMaxGrupo: isRodobensPDF ? prazoMaxGrupo : undefined,
+      parcelasFuro: isRodobensPDF ? parcelasFuro : undefined,
+      diluirFuro: isRodobensPDF ? diluirFuro : undefined,
+      tipoContemplacao: tipoContemplacao,
+      valorFuro: isRodobensPDF && parcelasFuro > 0 ? (parcelasFuro * (resultadoExibicao?.parcelaInicial || 0)) : 0,
       creditoBruto: credito,
       lanceEmbutido: resultadoExibicao?.lanceEmbutidoReais || 0,
       creditoLiquido: resultadoExibicao?.creditoLiquido || credito,
@@ -1072,7 +1078,8 @@ export default function SimuladorClient({
   }, [
     leads, leadId, activeAdmin, empresa, usuario, produto, modalidade,
     prazo, credito, lanceEmbutido, resultadoExibicao, taxaAdm,
-    fundoReserva, mesContemplacao, customEmpresaNome, customCorPrimaria, customLogoUrl
+    fundoReserva, mesContemplacao, customEmpresaNome, customCorPrimaria, customLogoUrl,
+    engineKey, prazoMaxGrupo, parcelasFuro, diluirFuro, tipoContemplacao
   ]);
 
   const handleGerarProposta = useCallback(async () => {

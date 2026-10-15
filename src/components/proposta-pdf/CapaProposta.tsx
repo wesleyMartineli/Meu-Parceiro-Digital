@@ -41,6 +41,11 @@ export interface PropostaData {
   parcelaSemFundoReserva?: number;
   prazoPosContemplacao?: number;
   chancesDeContemplacao?: string | number | null;
+  prazoMaxGrupo?: number;
+  parcelasFuro?: number;
+  diluirFuro?: boolean;
+  valorFuro?: number;
+  tipoContemplacao?: "sorteio" | "lance";
 }
 
 interface CapaPropostaProps {

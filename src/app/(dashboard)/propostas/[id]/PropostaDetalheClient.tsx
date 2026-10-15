@@ -366,6 +366,14 @@ export default function PropostaDetalheClient({ proposta }: PropostaDetalheClien
                     {proposta.simulacao.modalidade.replace("_", " ")}
                   </span>
                 </div>
+                {proposta.simulacao.input_json?.parcelasFuro !== undefined && proposta.simulacao.input_json.parcelasFuro > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-xs text-[#00441F] font-semibold">Parcelas Furo</span>
+                    <span className="font-bold text-red-600 text-xs">
+                      {proposta.simulacao.input_json.parcelasFuro}x ({proposta.simulacao.input_json.diluirFuro ? "Diluído" : "Na Contemplação"})
+                    </span>
+                  </div>
+                )}
               </div>
             ) : (
               <span className="text-xs text-[#00441F] font-semibold">Dados da simulação não encontrados.</span>

@@ -336,9 +336,19 @@ export const PropostaPDFDocument = ({ data }: PropostaPDFDocumentProps) => {
                 <Text style={page4Styles.value}>{formatCurrency(data.recursosProprios)}</Text>
               </View>
               <View style={page4Styles.rowValue}>
-                <Text style={page4Styles.label}>Lance Ofertado Total</Text>
+                <Text style={page4Styles.label}>
+                  {data.tipoContemplacao === 'sorteio' ? (data.lanceOfertado && data.lanceOfertado > 0 ? 'Pagamento no Sorteio (Furo)' : 'Lance Ofertado') : 'Lance Ofertado Total'}
+                </Text>
                 <Text style={page4Styles.value}>{formatCurrency(data.lanceOfertado)}</Text>
               </View>
+              {data.parcelasFuro !== undefined && data.parcelasFuro > 0 ? (
+                <View style={page4Styles.rowValue}>
+                  <Text style={[page4Styles.label, { color: '#b91c1c', fontWeight: 'bold' }]}>Parcelas Furo</Text>
+                  <Text style={[page4Styles.value, { color: '#b91c1c', fontWeight: 'bold' }]}>
+                    {data.parcelasFuro}x ({data.diluirFuro ? 'Diluído' : 'Na Contemplação'})
+                  </Text>
+                </View>
+              ) : null}
             </View>
 
             {data.adminNome?.toLowerCase().includes("porto bank") ? (
@@ -454,10 +464,34 @@ export const PropostaPDFDocument = ({ data }: PropostaPDFDocumentProps) => {
           <View style={page4Styles.colSide}>
             <View style={page4Styles.card}>
               <Text style={page4Styles.label}>Dados do Grupo</Text>
-              <View style={{ backgroundColor: '#f2f4f6', padding: 10, borderRadius: 5, marginTop: 10 }}>
-                <Text style={{ fontSize: 8, color: '#585f6c', textTransform: 'uppercase' }}>Prazo Máximo do Grupo</Text>
-                <Text style={{ fontSize: 16, fontWeight: 'bold' }}>{data.prazo} meses</Text>
+              <View style={{ backgroundColor: '#f2f4f6', padding: 8, borderRadius: 5, marginTop: 8 }}>
+                <Text style={{ fontSize: 7.5, color: '#585f6c', textTransform: 'uppercase' }}>Prazo Máximo do Grupo</Text>
+                <Text style={{ fontSize: 14, fontWeight: 'bold' }}>{(data.prazoMaxGrupo || data.prazo)} meses</Text>
               </View>
+              {data.prazoMaxGrupo && data.prazoMaxGrupo !== data.prazo ? (
+                <View style={{ backgroundColor: '#f2f4f6', padding: 8, borderRadius: 5, marginTop: 5 }}>
+                  <Text style={{ fontSize: 7.5, color: '#585f6c', textTransform: 'uppercase' }}>Prazo da Cota</Text>
+                  <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#00441F' }}>{data.prazo} meses</Text>
+                </View>
+              ) : null}
+              {data.parcelasFuro !== undefined && data.parcelasFuro > 0 ? (
+                <View style={{ backgroundColor: '#FFF5F5', borderWidth: 1, borderColor: '#FEB2B2', padding: 8, borderRadius: 5, marginTop: 5 }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={{ fontSize: 7.5, color: '#C53030', textTransform: 'uppercase', fontWeight: 'bold' }}>Parcelas Furo</Text>
+                    <Text style={{ fontSize: 12, fontWeight: 'bold', color: '#9B2C2C' }}>{data.parcelasFuro}x</Text>
+                  </View>
+                  <Text style={{ fontSize: 7, color: '#742A2A', marginTop: 2 }}>
+                    {data.diluirFuro ? 'Diluído nas parcelas mensais' : 'Acerto na contemplação'}
+                  </Text>
+                </View>
+              ) : (
+                data.isRodobens ? (
+                  <View style={{ backgroundColor: '#f2f4f6', padding: 6, borderRadius: 5, marginTop: 5 }}>
+                    <Text style={{ fontSize: 7.5, color: '#585f6c', textTransform: 'uppercase' }}>Parcelas Furo</Text>
+                    <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#00441F' }}>0 (Sem furo)</Text>
+                  </View>
+                ) : null
+              )}
             </View>
 
             <View style={[page4Styles.card, { backgroundColor: cSecundaria, borderColor: cPrimaria, marginBottom: 0 }]}>
@@ -488,10 +522,16 @@ export const PropostaPDFDocument = ({ data }: PropostaPDFDocumentProps) => {
           <Text style={[styles.pageNumber, { backgroundColor: cSecundaria, color: cPrimaria }]}>PÁGINA 4 DE 6</Text>
         </View>
 
-        <Text style={styles.sectionTitle}>Estratégia de Lance</Text>
-        <Text style={[styles.textBody, { fontSize: 10, textAlign: 'left' }]}>Uma alocação inteligente de recursos visando a aceleração da sua contemplação. Esta proposta foi desenhada para maximizar suas chances no curto prazo, equilibrando fluxo de caixa e competitividade no grupo.</Text>
+        <Text style={styles.sectionTitle}>
+          {data.tipoContemplacao === 'sorteio' ? 'Estratégia de Contemplação' : 'Estratégia de Lance'}
+        </Text>
+        <Text style={[styles.textBody, { fontSize: 10, textAlign: 'left' }]}>
+          {data.tipoContemplacao === 'sorteio'
+            ? 'Uma estrutura de consórcio planejada para aquisição através de contemplações por sorteio nas assembleias, conciliando investimento equilibrado e preservação de capital.'
+            : 'Uma alocação inteligente de recursos visando a aceleração da sua contemplação. Esta proposta foi desenhada para maximizar suas chances no curto prazo, equilibrando fluxo de caixa e competitividade no grupo.'}
+        </Text>
 
-        <View style={{ ...page4Styles.card, backgroundColor: '#f2f4f6', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 20 }}>
+        <View style={{ ...page4Styles.card, backgroundColor: '#f2f4f6', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 15 }}>
           <Text style={{ fontSize: 12, fontWeight: 'bold', color: '#585f6c' }}>CRÉDITO LÍQUIDO DISPONÍVEL</Text>
           <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#00441F' }}>{formatCurrency(data.creditoLiquido)}</Text>
         </View>
@@ -510,20 +550,50 @@ export const PropostaPDFDocument = ({ data }: PropostaPDFDocumentProps) => {
           </View>
 
           <View style={{ ...page4Styles.card, width: '34%', backgroundColor: cPrimaria, borderColor: cPrimaria }}>
-            <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#ffffff', marginBottom: 20 }}>LANCE TOTAL OFERTADO</Text>
+            <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#ffffff', marginBottom: 20 }}>
+              {data.tipoContemplacao === 'sorteio'
+                ? (data.lanceOfertado && data.lanceOfertado > 0 ? 'PAGAMENTO FURO (SORTEIO)' : 'CONTEMPLAÇÃO POR SORTEIO')
+                : 'LANCE TOTAL OFERTADO'}
+            </Text>
             <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#ffffff' }}>{formatCurrency(data.lanceOfertado)}</Text>
             <View style={{ backgroundColor: 'rgba(255,255,255,0.2)', padding: 5, borderRadius: 5, marginTop: 10, alignSelf: 'flex-start' }}>
-              <Text style={{ fontSize: 10, color: '#ffffff' }}>{data.lanceOfertadoPercentual?.toFixed(2) || '0.00'}% da Carta</Text>
+              <Text style={{ fontSize: 10, color: '#ffffff' }}>
+                {data.tipoContemplacao === 'sorteio' && (!data.lanceOfertado || data.lanceOfertado === 0)
+                  ? 'Contemplação por Sorteio'
+                  : `${data.lanceOfertadoPercentual?.toFixed(2) || '0.00'}% da Carta`}
+              </Text>
             </View>
           </View>
         </View>
 
-        <View style={{ borderLeftWidth: 4, borderLeftColor: cPrimaria, paddingLeft: 15, backgroundColor: '#E0E5CF', padding: 15, borderRadius: 5, marginTop: 10 }}>
-          <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#00441F', marginBottom: 5 }}>RECOMENDAÇÃO ESTRATÉGICA</Text>
-          <Text style={[styles.textBody, { fontSize: 9.5, textAlign: 'left' }]}>&quot;Nesta estratégia, parte da oferta é composta por lance embutido e parte por recursos próprios, aumentando a competitividade da operação e reduzindo a necessidade de capital imediato.&quot;</Text>
+        <View style={{ borderLeftWidth: 4, borderLeftColor: cPrimaria, paddingLeft: 15, backgroundColor: '#E0E5CF', padding: 12, borderRadius: 5, marginTop: 10 }}>
+          <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#00441F', marginBottom: 4 }}>RECOMENDAÇÃO ESTRATÉGICA</Text>
+          <Text style={[styles.textBody, { fontSize: 9, textAlign: 'left' }]}>
+            {data.tipoContemplacao === 'sorteio'
+              ? 'Nesta modalidade, a cota concorre prioritariamente por sorteio mensal oficial da administradora, preservando sua liquidez integral para momento oportuno.'
+              : '&quot;Nesta estratégia, parte da oferta é composta por lance embutido e parte por recursos próprios, aumentando a competitividade da operação e reduzindo a necessidade de capital imediato.&quot;'}
+          </Text>
         </View>
 
-        <Text style={{ fontSize: 12, fontWeight: 'bold', color: '#00441F', marginTop: 30, marginBottom: 15 }}>IMPACTO NA CONTEMPLAÇÃO</Text>
+        {data.parcelasFuro !== undefined && data.parcelasFuro > 0 ? (
+          <View style={{ borderLeftWidth: 4, borderLeftColor: '#f59e0b', paddingLeft: 15, backgroundColor: '#fffbeb', padding: 10, borderRadius: 5, marginTop: 8 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
+              <Text style={{ fontSize: 9.5, fontWeight: 'bold', color: '#92400e' }}>
+                INFORMAÇÃO DAS PARCELAS FURO ({data.parcelasFuro}x)
+              </Text>
+              <Text style={{ fontSize: 8.5, fontWeight: 'bold', color: '#b45309' }}>
+                {data.diluirFuro ? 'Diluição nas Parcelas Mensais' : 'Acerto na Contemplação'}
+              </Text>
+            </View>
+            <Text style={[styles.textBody, { fontSize: 8.5, textAlign: 'left', color: '#78350f' }]}>
+              {data.diluirFuro
+                ? `Esta cota possui ${data.parcelasFuro} parcelas de furo diluídas linearmente nas mensalidades contratadas, sem necessidade de desembolso extra na contemplação.`
+                : `Esta cota possui ${data.parcelasFuro} parcelas de furo. Na contemplação, o valor correspondente (${formatCurrency(data.valorFuro || (data.parcelasFuro * (data.parcelaInicial || 0)))}) é quitado integralmente — absorvido pelo lance ofertado ou pago no acerto de contemplação por sorteio.`}
+            </Text>
+          </View>
+        ) : null}
+
+        <Text style={{ fontSize: 12, fontWeight: 'bold', color: '#00441F', marginTop: data.parcelasFuro && data.parcelasFuro > 0 ? 12 : 22, marginBottom: 12 }}>IMPACTO NA CONTEMPLAÇÃO</Text>
         {(() => {
           let probabilidade = data.chancesOferta;
           const percentual = data.lanceOfertadoPercentual || 0;
@@ -609,9 +679,17 @@ export const PropostaPDFDocument = ({ data }: PropostaPDFDocumentProps) => {
           <Text style={{ fontSize: 12, fontWeight: 'bold', color: '#00441F', marginBottom: 15 }}>ESTRUTURA DA OFERTA E PAGAMENTO</Text>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
             <View style={{ width: '48%' }}>
-              <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#585f6c', marginBottom: 5 }}>LANCE TOTAL OFERTADO</Text>
+              <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#585f6c', marginBottom: 5 }}>
+                {data.tipoContemplacao === 'sorteio'
+                  ? (data.lanceOfertado && data.lanceOfertado > 0 ? 'PAGAMENTO NO SORTEIO (FURO)' : 'PAGAMENTO NA CONTEMPLAÇÃO')
+                  : 'LANCE TOTAL OFERTADO'}
+              </Text>
               <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#00441F' }}>{formatCurrency(data.lanceOfertado)}</Text>
-              <Text style={{ fontSize: 8, color: '#99a0af', marginTop: 2 }}>{data.lanceOfertadoPercentual?.toFixed(2) || '0.00'}% da Carta</Text>
+              <Text style={{ fontSize: 8, color: '#99a0af', marginTop: 2 }}>
+                {data.tipoContemplacao === 'sorteio' && (!data.lanceOfertado || data.lanceOfertado === 0)
+                  ? 'Contemplação por Sorteio'
+                  : `${data.lanceOfertadoPercentual?.toFixed(2) || '0.00'}% da Carta`}
+              </Text>
               
               <View style={{ marginTop: 10, flexDirection: 'row', justifyContent: 'space-between', paddingRight: 15 }}>
                 <View>
@@ -636,9 +714,26 @@ export const PropostaPDFDocument = ({ data }: PropostaPDFDocumentProps) => {
                   <Text style={{ fontSize: 10, fontWeight: 'bold' }}>{formatCurrency(data.parcelaPosAdesao)}</Text>
                 </View>
               ) : (
-                <View style={{ marginTop: 10 }}>
-                  <Text style={{ fontSize: 8, color: '#585f6c' }}>Prazo Total</Text>
-                  <Text style={{ fontSize: 10, fontWeight: 'bold' }}>{data.prazo} meses</Text>
+                <View style={{ marginTop: 10, flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <View>
+                    <Text style={{ fontSize: 8, color: '#585f6c' }}>Prazo Total</Text>
+                    <Text style={{ fontSize: 10, fontWeight: 'bold' }}>{data.prazo} meses</Text>
+                  </View>
+                  {data.parcelasFuro !== undefined && data.parcelasFuro > 0 ? (
+                    <View>
+                      <Text style={{ fontSize: 8, color: '#585f6c', textAlign: 'right' }}>Parcelas Furo</Text>
+                      <Text style={{ fontSize: 10, fontWeight: 'bold', textAlign: 'right', color: '#b91c1c' }}>
+                        {data.parcelasFuro}x ({data.diluirFuro ? 'Diluído' : 'Na Contemp.'})
+                      </Text>
+                    </View>
+                  ) : (
+                    data.isRodobens ? (
+                      <View>
+                        <Text style={{ fontSize: 8, color: '#585f6c', textAlign: 'right' }}>Parcelas Furo</Text>
+                        <Text style={{ fontSize: 10, fontWeight: 'bold', textAlign: 'right', color: '#00441F' }}>0 (Sem furo)</Text>
+                      </View>
+                    ) : null
+                  )}
                 </View>
               )}
             </View>
@@ -730,7 +825,10 @@ export const PropostaPDFDocument = ({ data }: PropostaPDFDocumentProps) => {
               </View>
             </View>
             <View style={{ backgroundColor: cSecundaria, padding: 10, borderRadius: 5 }}>
-              <Text style={{ fontSize: 10, color: cPrimaria, fontWeight: 'bold' }}>Esta estratégia foi desenhada para maximizar suas chances de contemplação mantendo a parcela dentro de uma margem segura de fluxo de caixa.</Text>
+              <Text style={{ fontSize: 9.5, color: cPrimaria, fontWeight: 'bold' }}>
+                Esta estratégia foi desenhada para maximizar suas chances de contemplação mantendo a parcela dentro de uma margem segura de fluxo de caixa.
+                {data.parcelasFuro !== undefined && data.parcelasFuro > 0 ? ` Operação estruturada com ${data.parcelasFuro} parcelas de furo (${data.diluirFuro ? 'diluídas linearmente nas mensalidades' : 'com quitação programada na contemplação'}).` : ''}
+              </Text>
             </View>
           </View>
 
