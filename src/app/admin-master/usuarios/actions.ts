@@ -37,6 +37,12 @@ export async function changeUserPasswordAction(userId: string, newPassword: stri
       return { success: false, message: `Erro ao alterar senha: ${error.message}` };
     }
 
+    // Libera o usuário diretamente caso estivesse marcado com primeiro acesso
+    await supabaseAdmin
+      .from('usuarios')
+      .update({ primeiro_acesso: false })
+      .eq('id', userId);
+
     // Registrar a ação na auditoria (se existir a funcionalidade)
     try {
       await logAuditEvent({
