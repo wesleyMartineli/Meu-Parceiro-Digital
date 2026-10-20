@@ -20,7 +20,7 @@ interface CotaEstudo {
   grupo: string;           // Número/nome do grupo (informativo)
   credito: number;
   prazo: number;
-  modalidade: 'linear' | 'linear_70' | 'reducao_50' | 'degrau' | 'degrau_70';
+  modalidade: 'linear' | 'linear_70' | 'reducao_50' | 'degrau' | 'degrau_70' | 'degrau_50';
   taxaAdm: number;
   seguro: number;
   quantidadeParcelasLance: number; // Qtd de parcelas de lance (Rodobens)
@@ -51,6 +51,7 @@ const MODALIDADE_LABEL: Record<string, string> = {
   reducao_50: 'Redução 50%',
   degrau: 'Degrau',
   degrau_70: 'Degrau 70%',
+  degrau_50: 'Degrau 50%',
 };
 
 function getPrazoCotaMaximo(produto: string) {
@@ -603,6 +604,7 @@ export default function EstudoOperacoesClient({
                 <div className="text-[10px] text-[#00441F]/70 font-medium bg-white/50 rounded-lg px-3 py-2 border border-[#E0E5CF]">
                   {activeCota.modalidade === 'degrau' && '📉 Degrau: Taxa ADM concentrada na 1ª metade. Parcela cai pela metade após o meio do prazo.'}
                   {activeCota.modalidade === 'degrau_70' && '📉 Degrau 70%: Degrau com pagamento reduzido a 70% antes da contemplação.'}
+                  {activeCota.modalidade === 'degrau_50' && '📉 Degrau 50%: Degrau com pagamento reduzido a 50% antes da contemplação.'}
                   {activeCota.modalidade === 'linear' && '📊 Linear (100%): Parcela integral durante todo o prazo.'}
                   {activeCota.modalidade === 'linear_70' && '📊 Linear 70%: Paga 70% da parcela antes de ser contemplado.'}
                   {activeCota.modalidade === 'reducao_50' && '📊 Redução 50%: Parcela reduzida a 50% antes da contemplação.'}

@@ -32,7 +32,7 @@ export function calcularCotaRodobens(input: SimulacaoInput): CotaResult {
   let TA_plano_inicial = TA_plano_linear;
   let prazoDiluicao = prazo - efetivoMesContemplacao;
 
-  if (modalidade === 'degrau' || modalidade === 'degrau_70') {
+  if (modalidade === 'degrau' || modalidade === 'degrau_70' || modalidade === 'degrau_50') {
     const meioPrazo = Math.ceil(prazo / 2);
     TA_plano_inicial = (credito * (taxaAdm / 100)) / meioPrazo;
     prazoDiluicao = Math.ceil(prazo / 2) - efetivoMesContemplacao;
@@ -62,7 +62,7 @@ export function calcularCotaRodobens(input: SimulacaoInput): CotaResult {
     // Portanto, o lance total é simplesmente a quantidade × parcela da cota.
     const qParcelasCota = quantidadeParcelasLance || 0;
     
-    if (modalidade === 'degrau' || modalidade === 'degrau_70') {
+    if (modalidade === 'degrau' || modalidade === 'degrau_70' || modalidade === 'degrau_50') {
       const meioPrazo = Math.ceil(prazo / 2);
       const TA_dobrada = (credito * (taxaAdm / 100)) / meioPrazo;
       
@@ -79,7 +79,7 @@ export function calcularCotaRodobens(input: SimulacaoInput): CotaResult {
     }
 
     if (input.baseCalculoLance === 'reduzida') {
-      lanceTotalReais *= 0.70;
+      lanceTotalReais *= (modalidade === 'reducao_50' || modalidade === 'degrau_50') ? 0.50 : 0.70;
     }
   }
 
@@ -129,7 +129,7 @@ export function calcularCotaRodobens(input: SimulacaoInput): CotaResult {
 
   if (lanceParaPrazo > 0) {
     let valorParcelaFinal = FC_plano + FR_plano_linear + SE_plano_linear;
-    if (modalidade !== 'degrau' && modalidade !== 'degrau_70') {
+    if (modalidade !== 'degrau' && modalidade !== 'degrau_70' && modalidade !== 'degrau_50') {
       valorParcelaFinal += TA_plano_linear;
     }
     qtdParcelasInteirasPrazo = Math.floor(lanceParaPrazo / valorParcelaFinal);
@@ -170,7 +170,7 @@ export function calcularCotaRodobens(input: SimulacaoInput): CotaResult {
     const FR_cheio = FR_plano_linear;
     const SE_cheio = SE_plano_linear;
 
-    if (modalidade === 'degrau' || modalidade === 'degrau_70') {
+    if (modalidade === 'degrau' || modalidade === 'degrau_70' || modalidade === 'degrau_50') {
       const meioPrazo = Math.ceil(prazo / 2);
       TA_cheio = mes <= meioPrazo ? (credito * (taxaAdm / 100)) / meioPrazo : 0;
     }
@@ -186,7 +186,7 @@ export function calcularCotaRodobens(input: SimulacaoInput): CotaResult {
         FC_efetiva = FC_cheio * 0.7;
         TA_efetiva = TA_cheio * 0.7;
         diferencaAcumulada += (FC_cheio + TA_cheio) - (FC_efetiva + TA_efetiva);
-      } else if (modalidade === 'reducao_50') {
+      } else if (modalidade === 'reducao_50' || modalidade === 'degrau_50') {
         FC_efetiva = FC_cheio * 0.5;
         TA_efetiva = TA_cheio * 0.5;
         diferencaAcumulada += (FC_cheio + TA_cheio) - (FC_efetiva + TA_efetiva);
@@ -284,7 +284,7 @@ export function calcularCotaRodobens(input: SimulacaoInput): CotaResult {
   if (efetivoMesContemplacao > 0 && efetivoMesContemplacao < prazo) {
     const pCont = cronograma.find(p => p.mes > efetivoMesContemplacao);
     if (pCont) {
-       if (modalidade === 'degrau' || modalidade === 'degrau_70') {
+       if (modalidade === 'degrau' || modalidade === 'degrau_70' || modalidade === 'degrau_50') {
           parcelaPosContemplacaoInicial = pCont.total;
        } else {
           parcelaFinal = pCont.total;
@@ -303,7 +303,7 @@ export function calcularCotaRodobens(input: SimulacaoInput): CotaResult {
     parcelaInicial: Number(parcelaInicial.toFixed(2)),
     parcelaFinal: Number(parcelaFinal.toFixed(2)),
     parcelaPosContemplacaoInicial: parcelaPosContemplacaoInicial ? Number(parcelaPosContemplacaoInicial.toFixed(2)) : undefined,
-    parcelaFinalNormal: (modalidade === 'degrau' || modalidade === 'degrau_70') ? Number((FC_plano + FR_plano_linear + SE_plano_linear).toFixed(2)) : undefined,
+    parcelaFinalNormal: (modalidade === 'degrau' || modalidade === 'degrau_70' || modalidade === 'degrau_50') ? Number((FC_plano + FR_plano_linear + SE_plano_linear).toFixed(2)) : undefined,
     lanceEmbutidoReais: Number(lanceEmbutidoReais.toFixed(2)),
     recursosPropriosReais: Number(recursosPropriosReais.toFixed(2)),
     lanceTotalReais: Number(lanceTotalReais.toFixed(2)),

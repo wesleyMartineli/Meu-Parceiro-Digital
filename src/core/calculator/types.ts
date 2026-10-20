@@ -3,7 +3,7 @@
 export interface SimulacaoInput {
   credito: number;          // Crédito Bruto
   prazo: number;             // Prazo em meses
-  modalidade: 'linear' | 'linear_70' | 'reducao_50' | 'degrau' | 'degrau_70' | 'pontual' | 'reduzida';
+  modalidade: 'linear' | 'linear_70' | 'reducao_50' | 'degrau' | 'degrau_70' | 'degrau_50' | 'pontual' | 'reduzida';
   taxaAdm: number;           // Taxa de administração total em % (ex: 15)
   fundoReserva: number;      // Fundo de reserva total em % (ex: 2)
   seguro: number;            // Seguro total em % (ex: 1)

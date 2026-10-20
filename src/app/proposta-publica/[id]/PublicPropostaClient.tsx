@@ -105,6 +105,8 @@ export default function PublicPropostaClient({ proposta }: PublicPropostaClientP
         return "Degrau / Escalona";
       case "degrau_70":
         return "Degrau 70%";
+      case "degrau_50":
+        return "Degrau 50%";
       case "pontual":
         return "Pontual / Meia Parcela";
       default:

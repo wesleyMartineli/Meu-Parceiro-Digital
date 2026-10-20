@@ -39,7 +39,7 @@ interface CotaInputState {
   id: string;
   credito: number;
   prazo: number;
-  modalidade: "linear" | "linear_70" | "reducao_50" | "degrau" | "degrau_70" | "pontual" | "reduzida";
+  modalidade: "linear" | "linear_70" | "reducao_50" | "degrau" | "degrau_70" | "degrau_50" | "pontual" | "reduzida";
   taxaAdm: number;
   fundoReserva: number;
   seguro: number;
@@ -580,6 +580,7 @@ export default function MultiCotasClient({ leads, administradoras, empresa, usua
                   <option value="reducao_50">Redução 50%</option>
                   <option value="degrau">Degrau</option>
                   <option value="degrau_70">Degrau 70%</option>
+                  <option value="degrau_50">Degrau 50%</option>
                   <option value="pontual">Pontual (40%)</option>
                   {!isRodobens && <option value="reduzida">Reduzida</option>}
                 </select>

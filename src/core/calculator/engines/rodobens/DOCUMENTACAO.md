@@ -34,11 +34,12 @@ O cliente paga 100% da parcela cheia (FC + TA + FR + SE) desde o início até o 
 ### 2.3. Redução 50%
 Exatamente a mesma arquitetura do Linear 70%, porém o cliente paga apenas **50% do FC e da TA** até a contemplação. O acúmulo da diferença também é cobrado diluído após a contemplação.
 
-### 2.4. Degrau e Degrau 70%
+### 2.4. Degrau, Degrau 70% e Degrau 50%
 - **Metade do Prazo:** A Taxa de Administração (TA) **toda** é cobrada de forma superdimensionada apenas na primeira metade do prazo.
 - `TA_efetiva = (Credito * (TaxaAdm / 100)) / (Prazo / 2)` (apenas para meses <= metade do prazo).
 - Na segunda metade do plano, a Taxa de Administração zera, e o cliente paga apenas FC + Seguro + FR.
 - Se for **Degrau 70%**, o FC e essa TA superdimensionada sofrem redução de 30% antes da contemplação, gerando déficit acumulado.
+- Se for **Degrau 50%**, o FC e essa TA superdimensionada sofrem redução de 50% antes da contemplação (paga meia parcela), acumulando o saldo restante para ser diluído após a contemplação.
 
 ### 2.5. Plano Pontual (Adiantamento)
 O plano Pontual é uma modalidade de compra antecipada garantida, sem assembleia de lance competitivo.

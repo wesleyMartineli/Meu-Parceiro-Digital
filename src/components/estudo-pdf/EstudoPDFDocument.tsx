@@ -100,6 +100,7 @@ const MODALIDADE_LABEL: Record<string, string> = {
   reducao_50: 'Redução 50%',
   degrau: 'Degrau',
   degrau_70: 'Degrau 70%',
+  degrau_50: 'Degrau 50%',
 };
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────

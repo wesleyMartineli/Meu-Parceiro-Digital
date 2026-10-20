@@ -36,6 +36,7 @@ const simulacaoSchema = z.object({
     "reducao_50",
     "degrau",
     "degrau_70",
+    "degrau_50",
     "pontual",
     "reduzida",
   ]),
@@ -460,6 +461,7 @@ const MODALIDADES = [
   { value: "reducao_50", label: "Redução 50%" },
   { value: "degrau", label: "Degrau" },
   { value: "degrau_70", label: "Degrau 70%" },
+  { value: "degrau_50", label: "Degrau 50%" },
   { value: "pontual", label: "Pontual (40%)" },
 ] as const;
 
@@ -547,7 +549,7 @@ export default function SimuladorClient({
   const [prazo, setPrazo] = useState(180);
   const [prazoMaxGrupo, setPrazoMaxGrupo] = useState(216);
   const [modalidade, setModalidade] = useState<
-    "linear" | "linear_70" | "reducao_50" | "degrau" | "degrau_70" | "pontual" | "reduzida"
+    "linear" | "linear_70" | "reducao_50" | "degrau" | "degrau_70" | "degrau_50" | "pontual" | "reduzida"
   >("linear");
   const [reducaoCustomizada, setReducaoCustomizada] = useState(70);
   const [taxaAdm, setTaxaAdm] = useState(24);
@@ -2676,7 +2678,7 @@ const leadObj = leads?.find((l) => l.id === leadId);
                       <h4 className="font-extrabold text-sm mb-1.5 flex items-center gap-2">
                         Resultado Estratégico —{" "}
                         <span className="text-[#00CF7B] capitalize">
-                          {modalidade === "linear" ? "Linear / Integral" : modalidade === "linear_70" ? "Linear / Integral 70" : modalidade.replace("_", " ")}
+                          {modalidade === "linear" ? "Linear / Integral" : modalidade === "linear_70" ? "Linear / Integral 70" : modalidade === "degrau_70" ? "Degrau 70%" : modalidade === "degrau_50" ? "Degrau 50%" : modalidade.replace("_", " ")}
                         </span>
                       </h4>
 
@@ -2699,6 +2701,7 @@ const leadObj = leads?.find((l) => l.id === leadId);
                       {(modalidade === "linear_70" ||
                         modalidade === "reducao_50" ||
                         modalidade === "degrau_70" ||
+                        modalidade === "degrau_50" ||
                         modalidade === "reduzida") && (
                         <p className="text-xs text-[#002E17] font-semibold leading-relaxed font-light">
                           {modalidade === "reduzida" ? (
@@ -2720,7 +2723,9 @@ const leadObj = leads?.find((l) => l.id === leadId);
                         </p>
                       )}
 
-                      {modalidade === "degrau" && (
+                      {(modalidade === "degrau" ||
+                        modalidade === "degrau_70" ||
+                        modalidade === "degrau_50") && (
                         <p className="text-xs text-[#002E17] font-semibold leading-relaxed font-light">
                           A taxa de administração é concentrada nos primeiros 50% do
                           prazo total (meses 1 a {Math.ceil(prazo / 2)}), elevando
