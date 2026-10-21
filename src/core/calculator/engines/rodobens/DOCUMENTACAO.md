@@ -57,9 +57,8 @@ O Furo é uma regra severa e fundamental da Rodobens quando a Cota é vendida co
 
 **Cálculo:**
 1. Acha-se o `Valor do Furo em Reais` = `Furo (meses)` × `Parcela Linear Base`.
-2. Do valor do lance ofertado, abate-se primeiramente o Furo.
-3. Isso causa uma **redução de prazo matemática**, abaixando o tempo do contrato em exatos meses do furo quitado, mas sem baixar a parcela do cliente.
-4. Só o excesso de lance (`excessoLance = Lance Total - Valor Furo`) será usado para a escolha de abatimento de Parcela ou Prazo pelo cliente.
+2. **Quando não diluído:** Do valor do lance ofertado, abate-se primeiramente o Furo. Isso causa uma redução de prazo matemática, e só o excesso de lance (`excessoLance = Lance Total - Valor Furo`) será usado para a escolha de abatimento.
+3. **Quando diluído (`diluirFuro = true`):** O valor do furo é diluído ao longo das parcelas do plano (`adicionalFuro = Valor Furo / Prazo`). A parcela da cota mensal aumenta nessa quantia, e **o valor do lance (em quantidade de parcelas) é calculado diretamente em cima da parcela já com o furo diluído**, conferindo maior poder de lance ao cliente.
 
 ---
 

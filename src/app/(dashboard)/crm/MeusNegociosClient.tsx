@@ -18,9 +18,12 @@ import {
   ChevronLeft,
   Briefcase,
   ShieldCheck,
-  Trash2
+  Trash2,
+  Plus,
+  Sparkles,
+  Calculator
 } from 'lucide-react';
-import { updateNegocioStageAction, deleteNegocioAction } from '@/modules/crm/actions';
+import { updateNegocioStageAction, deleteNegocioAction, createNegocioManualAction } from '@/modules/crm/actions';
 
 interface GerenteNegocio {
   id: string;
@@ -69,10 +72,18 @@ interface UsuarioHierarquia {
   supervisor_id?: string | null;
 }
 
+interface ClienteDisponivel {
+  id: string;
+  nome: string;
+  telefone?: string | null;
+  email?: string | null;
+}
+
 interface MeusNegociosClientProps {
   negocios: Negocio[];
   gerentes: GerenteNegocio[];
   usuariosHierarquia?: UsuarioHierarquia[];
+  clientesDisponiveis?: ClienteDisponivel[];
   currentUser: {
     id: string;
     role: string;
@@ -80,13 +91,43 @@ interface MeusNegociosClientProps {
   };
 }
 
-const ETAPAS = [
-  { id: 'novo_lead', label: 'Em Atendimento', subtitle: 'Contato' },
-  { id: 'qualificacao', label: 'Qualificação', subtitle: 'Filtro' },
-  { id: 'simulacao_apresentada', label: 'Simulação Apresentada', subtitle: 'Proposta' },
-  { id: 'proposta_enviada', label: 'Proposta Enviada', subtitle: 'Decisão' },
-  { id: 'negociacao', label: 'Negociação / Follow-up', subtitle: 'Acompanhamento' },
-  { id: 'ganho', label: 'Fechado / Ganho', subtitle: 'Sucesso' },
+export function getProdutoParam(negocio: Negocio): string {
+  const text = `${negocio.modalidade || ''} ${negocio.titulo || ''} ${negocio.propostas?.simulacoes?.produto || ''}`.toLowerCase();
+  if (text.includes('pesad') || text.includes('caminha') || text.includes('trator') || text.includes('maquina')) return 'pesado';
+  if (text.includes('auto') || text.includes('carro') || text.includes('veicul')) return 'auto';
+  if (text.includes('moto') || text.includes('motocicl')) return 'moto';
+  if (text.includes('servic')) return 'servico';
+  return 'imovel';
+}
+
+export function normalizeEtapa(etapa?: string | null): string {
+  if (!etapa) return 'oportunidades';
+  const clean = etapa.trim().toLowerCase();
+  if (
+    clean === 'novo_lead' ||
+    clean === 'em_atendimento' ||
+    clean === 'qualificacao' ||
+    clean === 'sem_contato' ||
+    clean === 'contato_realizado'
+  ) {
+    return 'oportunidades';
+  }
+  if (clean === 'simulacao_apresentada') {
+    return 'simulacao_criada';
+  }
+  if (clean === 'ganho' || clean === 'fechado') {
+    return 'fechado_ganho';
+  }
+  return clean;
+}
+
+export const ETAPAS = [
+  { id: 'oportunidades', label: 'Oportunidades / Qualificação', subtitle: 'Captação' },
+  { id: 'simulacao_criada', label: 'Simulação Criada', subtitle: 'Simulação' },
+  { id: 'proposta_enviada', label: 'Proposta Enviada', subtitle: 'Proposta' },
+  { id: 'negociacao', label: 'Negociação / Follow Up', subtitle: 'Acompanhamento' },
+  { id: 'pre_fechamento', label: 'Pré-Fechamento', subtitle: 'Decisão' },
+  { id: 'fechado_ganho', label: 'Fechado / Ganho', subtitle: 'Sucesso' },
   { id: 'perdido', label: 'Perdido', subtitle: 'Arquivado' },
 ];
 
@@ -94,10 +135,20 @@ export default function MeusNegociosClient({
   negocios,
   gerentes,
   usuariosHierarquia,
+  clientesDisponiveis,
   currentUser,
 }: MeusNegociosClientProps) {
   const [viewMode, setViewMode] = useState<'table' | 'kanban'>('table');
   const [isPendingMove, startTransition] = useTransition();
+
+  // Modal Nova Oportunidade
+  const [isNovaOportunidadeOpen, setIsNovaOportunidadeOpen] = useState(false);
+  const [oportunidadeClienteId, setOportunidadeClienteId] = useState('');
+  const [oportunidadeProduto, setOportunidadeProduto] = useState('imovel');
+  const [oportunidadeCredito, setOportunidadeCredito] = useState(200000);
+  const [oportunidadeTitulo, setOportunidadeTitulo] = useState('');
+  const [isSubmittingOportunidade, setIsSubmittingOportunidade] = useState(false);
+  const [oportunidadeFeedback, setOportunidadeFeedback] = useState<string | null>(null);
 
   const isLeader =
     currentUser.role === 'regional' ||
@@ -195,6 +246,50 @@ export default function MeusNegociosClient({
       .map(([id, nome]) => ({ id, nome }))
       .sort((a, b) => a.nome.localeCompare(b.nome));
   }, [negocios]);
+
+  const listaClientes = useMemo(() => {
+    if (clientesDisponiveis && clientesDisponiveis.length > 0) {
+      return clientesDisponiveis;
+    }
+    return parceirosDisponiveis;
+  }, [clientesDisponiveis, parceirosDisponiveis]);
+
+  const handleCriarOportunidade = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!oportunidadeClienteId) {
+      setOportunidadeFeedback('Por favor, selecione um parceiro/cliente.');
+      return;
+    }
+    if (!oportunidadeCredito || oportunidadeCredito <= 0) {
+      setOportunidadeFeedback('Por favor, informe um valor de crédito válido.');
+      return;
+    }
+
+    setIsSubmittingOportunidade(true);
+    setOportunidadeFeedback(null);
+
+    const formData = new FormData();
+    formData.append('cliente_id', oportunidadeClienteId);
+    formData.append('modalidade', oportunidadeProduto);
+    formData.append('credito', oportunidadeCredito.toString());
+    formData.append('etapa_funil', 'oportunidades');
+    if (oportunidadeTitulo.trim()) {
+      formData.append('titulo', oportunidadeTitulo.trim());
+    }
+
+    const res = await createNegocioManualAction({ success: false, message: null }, formData);
+    setIsSubmittingOportunidade(false);
+
+    if (res.success) {
+      setIsNovaOportunidadeOpen(false);
+      setOportunidadeClienteId('');
+      setOportunidadeCredito(200000);
+      setOportunidadeTitulo('');
+      window.location.reload();
+    } else {
+      setOportunidadeFeedback(res.message || 'Erro ao criar oportunidade.');
+    }
+  };
 
   // Funções de atalhos de data
   const handleDatePreset = (preset: string) => {
@@ -315,7 +410,7 @@ export default function MeusNegociosClient({
       }
 
       const matchesParceiro = filterParceiro === 'all' || n.cliente_id === filterParceiro;
-      const matchesEtapa = filterEtapa === 'all' || n.etapa_funil === filterEtapa;
+      const matchesEtapa = filterEtapa === 'all' || normalizeEtapa(n.etapa_funil) === filterEtapa;
 
       const normalize = (str: string) =>
         str
@@ -413,17 +508,20 @@ export default function MeusNegociosClient({
   ]);
 
   const getEtapaLabel = (id: string) => {
-    return ETAPAS.find((e) => e.id === id)?.label || id;
+    const norm = normalizeEtapa(id);
+    return ETAPAS.find((e) => e.id === norm)?.label || id;
   };
 
   const getEtapaColor = (id: string) => {
-    if (id === 'ganho') return 'bg-emerald-50 text-emerald-800 border-emerald-300';
-    if (id === 'perdido') return 'bg-rose-50 text-rose-800 border-rose-300';
-    if (id === 'novo_lead') return 'bg-blue-50 text-blue-800 border-blue-300';
-    if (id === 'qualificacao') return 'bg-indigo-50 text-indigo-800 border-indigo-300';
-    if (id === 'simulacao_apresentada') return 'bg-amber-50 text-amber-800 border-amber-300';
-    if (id === 'proposta_enviada') return 'bg-purple-50 text-purple-800 border-purple-300';
-    return 'bg-teal-50 text-teal-800 border-teal-300';
+    const norm = normalizeEtapa(id);
+    if (norm === 'fechado_ganho') return 'bg-emerald-50 text-emerald-800 border-emerald-300';
+    if (norm === 'perdido') return 'bg-rose-50 text-rose-800 border-rose-300';
+    if (norm === 'oportunidades') return 'bg-blue-50 text-blue-800 border-blue-300';
+    if (norm === 'simulacao_criada') return 'bg-amber-50 text-amber-800 border-amber-300';
+    if (norm === 'proposta_enviada') return 'bg-purple-50 text-purple-800 border-purple-300';
+    if (norm === 'negociacao') return 'bg-indigo-50 text-indigo-800 border-indigo-300';
+    if (norm === 'pre_fechamento') return 'bg-teal-50 text-teal-800 border-teal-300';
+    return 'bg-gray-50 text-gray-800 border-gray-300';
   };
 
   const formatCurrency = (val: number) => {
@@ -437,34 +535,39 @@ export default function MeusNegociosClient({
 
   // Indicadores KPI
   const totalEmNegociacao = filteredNegocios
-    .filter((n) => n.etapa_funil !== 'ganho' && n.etapa_funil !== 'perdido')
+    .filter((n) => {
+      const s = normalizeEtapa(n.etapa_funil);
+      return s !== 'fechado_ganho' && s !== 'perdido';
+    })
     .reduce((acc, curr) => acc + Number(curr.credito || 0), 0);
 
   const totalGanhos = filteredNegocios
-    .filter((n) => n.etapa_funil === 'ganho')
+    .filter((n) => normalizeEtapa(n.etapa_funil) === 'fechado_ganho')
     .reduce((acc, curr) => acc + Number(curr.credito || 0), 0);
 
   const totalPerdidos = filteredNegocios
-    .filter((n) => n.etapa_funil === 'perdido')
+    .filter((n) => normalizeEtapa(n.etapa_funil) === 'perdido')
     .reduce((acc, curr) => acc + Number(curr.credito || 0), 0);
 
   const diferencaFechadoPerdido = totalGanhos - totalPerdidos;
-  const negociosAtivosCount = filteredNegocios.filter(
-    (n) => n.etapa_funil !== 'ganho' && n.etapa_funil !== 'perdido'
-  ).length;
-  const negociosGanhosCount = filteredNegocios.filter((n) => n.etapa_funil === 'ganho').length;
+  const negociosAtivosCount = filteredNegocios.filter((n) => {
+    const s = normalizeEtapa(n.etapa_funil);
+    return s !== 'fechado_ganho' && s !== 'perdido';
+  }).length;
+  const negociosGanhosCount = filteredNegocios.filter((n) => normalizeEtapa(n.etapa_funil) === 'fechado_ganho').length;
 
   // Kanban - Agrupar negócios por etapa
   const negociosByStage: Record<string, Negocio[]> = useMemo(() => {
     const grouped: Record<string, Negocio[]> = {};
     ETAPAS.forEach((etapa) => {
-      grouped[etapa.id] = filteredNegocios.filter((n) => n.etapa_funil === etapa.id);
+      grouped[etapa.id] = filteredNegocios.filter((n) => normalizeEtapa(n.etapa_funil) === etapa.id);
     });
     return grouped;
   }, [filteredNegocios]);
 
   const handleMoveStage = async (negocio: Negocio, direction: 'prev' | 'next') => {
-    const currentIndex = ETAPAS.findIndex((e) => e.id === negocio.etapa_funil);
+    const currentNorm = normalizeEtapa(negocio.etapa_funil);
+    const currentIndex = ETAPAS.findIndex((e) => e.id === currentNorm);
     const nextIndex = currentIndex + (direction === 'next' ? 1 : -1);
 
     if (nextIndex >= 0 && nextIndex < ETAPAS.length) {
@@ -548,6 +651,18 @@ export default function MeusNegociosClient({
               Pipeline (Kanban)
             </button>
           </div>
+
+          {/* Botão Nova Oportunidade */}
+          <button
+            onClick={() => {
+              setIsNovaOportunidadeOpen(true);
+              setOportunidadeFeedback(null);
+            }}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#00441F] px-4 py-2 text-sm font-bold text-white shadow-xs hover:bg-[#002E17] transition-all cursor-pointer"
+          >
+            <Plus className="h-4 w-4 text-[#00CF7B]" />
+            Nova Oportunidade
+          </button>
 
           <Link
             href="/simulador"
@@ -935,7 +1050,7 @@ export default function MeusNegociosClient({
                       {/* Etapa do Funil com Seletor Rápido */}
                       <td className="px-6 py-4 whitespace-nowrap">
                         <select
-                          value={negocio.etapa_funil}
+                          value={normalizeEtapa(negocio.etapa_funil)}
                           onChange={(e) => handleDropdownMove(negocio, e.target.value)}
                           disabled={isPendingMove}
                           className={`inline-flex items-center px-3 py-1.5 rounded-xl text-xs font-bold border outline-none cursor-pointer hover:opacity-90 transition-opacity shadow-xs ${getEtapaColor(
@@ -962,6 +1077,15 @@ export default function MeusNegociosClient({
 
                       {/* Ações */}
                       <td className="px-6 py-4 whitespace-nowrap text-right space-x-2">
+                        {normalizeEtapa(negocio.etapa_funil) === 'oportunidades' && (
+                          <Link
+                            href={`/simulador?leadId=${negocio.cliente_id}&produto=${getProdutoParam(negocio)}&credito=${negocio.credito}&oportunidadeId=${negocio.id}`}
+                            className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#00CF7B] text-xs font-black text-white hover:bg-[#00441F] transition-colors shadow-xs"
+                          >
+                            <Calculator className="w-3.5 h-3.5" />
+                            <span>Criar Simulação</span>
+                          </Link>
+                        )}
                         <Link
                           href={`/crm/${negocio.cliente_id}`}
                           className="inline-flex items-center justify-center px-3 py-1.5 rounded-xl border border-[#E0E5CF] bg-white text-xs font-bold text-[#00441F] hover:bg-gray-50 transition-colors shadow-xs"
@@ -1026,7 +1150,7 @@ export default function MeusNegociosClient({
                 <div className="flex-1 overflow-y-auto p-3 space-y-3">
                   {list.length === 0 ? (
                     <div className="border border-dashed border-[#E0E5CF] rounded-xl py-8 text-center text-xs text-[#00441F]/60 font-medium">
-                      Nenhuma oportunidade.
+                      {etapa.id === 'oportunidades' ? 'Nenhuma oportunidade / qualificação.' : 'Nenhum negócio nesta etapa.'}
                     </div>
                   ) : (
                     list.map((neg) => (
@@ -1061,12 +1185,30 @@ export default function MeusNegociosClient({
 
                         {/* Título do Negócio & Valor */}
                         <div className="pt-1 border-t border-gray-100">
-                          <div className="text-xs font-medium text-gray-700 line-clamp-1">
-                            {negocioFormatTitle(neg.titulo)}
-                          </div>
-                          <div className="text-base font-black text-[#00441F] mt-0.5">
-                            {formatCurrency(neg.credito)}
-                          </div>
+                          {normalizeEtapa(neg.etapa_funil) === 'oportunidades' ? (
+                            <Link
+                              href={`/simulador?leadId=${neg.cliente_id}&produto=${getProdutoParam(neg)}&credito=${neg.credito}&oportunidadeId=${neg.id}`}
+                              className="group/title block hover:bg-black/5 -mx-2 px-2 py-1 rounded-lg transition-colors cursor-pointer"
+                              title="Clique para abrir e criar simulação para esta oportunidade"
+                            >
+                              <div className="text-xs font-semibold text-[#00441F] group-hover/title:text-[#00CF7B] transition-colors line-clamp-1 flex items-center justify-between">
+                                <span>{negocioFormatTitle(neg.titulo)}</span>
+                                <span className="text-[10px] text-[#00CF7B] font-extrabold">Simular ⚡</span>
+                              </div>
+                              <div className="text-base font-black text-[#00441F] mt-0.5">
+                                {formatCurrency(neg.credito)}
+                              </div>
+                            </Link>
+                          ) : (
+                            <>
+                              <div className="text-xs font-medium text-gray-700 line-clamp-1">
+                                {negocioFormatTitle(neg.titulo)}
+                              </div>
+                              <div className="text-base font-black text-[#00441F] mt-0.5">
+                                {formatCurrency(neg.credito)}
+                              </div>
+                            </>
+                          )}
                         </div>
 
                         {/* Tag de Gerente Responsável (para liderança) */}
@@ -1075,6 +1217,17 @@ export default function MeusNegociosClient({
                             <UserCheck className="w-3.5 h-3.5 text-[#00CF7B]" />
                             <span className="truncate">{neg.usuarios?.nome || 'Gerente do Time'}</span>
                           </div>
+                        )}
+
+                        {/* Botão de Destaque para Oportunidades: Criar Simulação */}
+                        {normalizeEtapa(neg.etapa_funil) === 'oportunidades' && (
+                          <Link
+                            href={`/simulador?leadId=${neg.cliente_id}&produto=${getProdutoParam(neg)}&credito=${neg.credito}&oportunidadeId=${neg.id}`}
+                            className="w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-[#00CF7B] hover:bg-[#00441F] text-white text-xs font-black shadow-xs transition-all text-center cursor-pointer"
+                          >
+                            <Calculator className="w-3.5 h-3.5" />
+                            <span>Criar Simulação</span>
+                          </Link>
                         )}
 
                         {/* Rodapé do Card: Links e Excluir */}
@@ -1107,7 +1260,7 @@ export default function MeusNegociosClient({
                         <div className="flex items-center justify-between border-t border-gray-100 pt-2 gap-1.5">
                           <button
                             onClick={() => handleMoveStage(neg, 'prev')}
-                            disabled={isPendingMove || neg.etapa_funil === ETAPAS[0].id}
+                            disabled={isPendingMove || normalizeEtapa(neg.etapa_funil) === ETAPAS[0].id}
                             className="p-1 rounded-md bg-gray-50 hover:bg-gray-100 border border-gray-200 text-[#00441F] disabled:opacity-30 cursor-pointer"
                             title="Mover para etapa anterior"
                           >
@@ -1115,7 +1268,7 @@ export default function MeusNegociosClient({
                           </button>
 
                           <select
-                            value={neg.etapa_funil}
+                            value={normalizeEtapa(neg.etapa_funil)}
                             disabled={isPendingMove}
                             onChange={(e) => handleDropdownMove(neg, e.target.value)}
                             className="text-[10px] font-bold bg-gray-50 border border-gray-200 rounded-md px-1.5 py-1 text-[#00441F] outline-none flex-1 text-center"
@@ -1130,7 +1283,7 @@ export default function MeusNegociosClient({
                           <button
                             onClick={() => handleMoveStage(neg, 'next')}
                             disabled={
-                              isPendingMove || neg.etapa_funil === ETAPAS[ETAPAS.length - 1].id
+                              isPendingMove || normalizeEtapa(neg.etapa_funil) === ETAPAS[ETAPAS.length - 1].id
                             }
                             className="p-1 rounded-md bg-gray-50 hover:bg-gray-100 border border-gray-200 text-[#00441F] disabled:opacity-30 cursor-pointer"
                             title="Mover para próxima etapa"
@@ -1145,6 +1298,186 @@ export default function MeusNegociosClient({
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Modal Nova Oportunidade */}
+      {isNovaOportunidadeOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-[#e9ebe4] border border-[#E0E5CF] rounded-3xl max-w-lg w-full p-6 shadow-2xl relative overflow-hidden">
+            {/* Header do Modal */}
+            <div className="flex items-center justify-between pb-4 border-b border-[#E0E5CF]">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-[#00CF7B]/20 text-[#00441F] flex items-center justify-center">
+                  <Sparkles className="w-5 h-5 text-[#00441F]" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-black text-[#00441F]">Nova Oportunidade</h2>
+                  <p className="text-xs text-[#00441F]/70 font-medium">Cadastre um interesse de negócio para iniciar a esteira</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsNovaOportunidadeOpen(false);
+                  setOportunidadeFeedback(null);
+                }}
+                className="p-1.5 rounded-xl hover:bg-black/5 text-[#00441F]/70 hover:text-[#00441F] transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {oportunidadeFeedback && (
+              <div className="mt-4 p-3 rounded-xl bg-red-100 border border-red-200 text-red-800 text-xs font-bold">
+                {oportunidadeFeedback}
+              </div>
+            )}
+
+            {/* Formulário */}
+            <form onSubmit={handleCriarOportunidade} className="mt-5 space-y-4">
+              {/* Parceiro / Cliente */}
+              <div>
+                <label className="block text-xs font-extrabold text-[#00441F] uppercase tracking-wider mb-1.5">
+                  1. Selecione o Parceiro / Cliente <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={oportunidadeClienteId}
+                  onChange={(e) => setOportunidadeClienteId(e.target.value)}
+                  required
+                  className="w-full bg-white border border-[#E0E5CF] rounded-xl px-3.5 py-2.5 text-xs font-bold text-[#00441F] outline-none focus:ring-2 focus:ring-[#00CF7B]"
+                >
+                  <option value="">-- Escolha um parceiro cadastrado --</option>
+                  {listaClientes.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.nome} {'telefone' in c && (c as any).telefone ? `(${(c as any).telefone})` : ''}
+                    </option>
+                  ))}
+                </select>
+                {listaClientes.length === 0 && (
+                  <p className="text-[11px] text-amber-700 mt-1 font-medium">
+                    Nenhum parceiro encontrado. Cadastre um parceiro primeiro no menu Parceiros.
+                  </p>
+                )}
+              </div>
+
+              {/* Produto */}
+              <div>
+                <label className="block text-xs font-extrabold text-[#00441F] uppercase tracking-wider mb-1.5">
+                  2. Produto de Interesse <span className="text-red-500">*</span>
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {[
+                    { id: 'imovel', label: 'Imóvel', icon: '🏠', val: 300000 },
+                    { id: 'auto', label: 'Auto', icon: '🚗', val: 120000 },
+                    { id: 'pesado', label: 'Pesados / Caminhão', icon: '🚛', val: 500000 },
+                    { id: 'servico', label: 'Serviços', icon: '🔧', val: 50000 },
+                    { id: 'moto', label: 'Moto', icon: '🏍️', val: 30000 },
+                  ].map((p) => {
+                    const selected = oportunidadeProduto === p.id;
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => {
+                          setOportunidadeProduto(p.id);
+                          if (oportunidadeCredito === 200000) {
+                            setOportunidadeCredito(p.val);
+                          }
+                        }}
+                        className={`flex items-center gap-2 p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                          selected
+                            ? 'bg-[#00441F] border-[#00441F] text-white shadow-xs'
+                            : 'bg-white border-[#E0E5CF] text-[#00441F] hover:bg-gray-50'
+                        }`}
+                      >
+                        <span className="text-base">{p.icon}</span>
+                        <span className="text-xs font-bold leading-tight">{p.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Valor do Crédito */}
+              <div>
+                <label className="block text-xs font-extrabold text-[#00441F] uppercase tracking-wider mb-1.5">
+                  3. Valor do Crédito Estimado (R$) <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-black text-[#00441F]/60">
+                    R$
+                  </span>
+                  <input
+                    type="number"
+                    min="1000"
+                    step="1000"
+                    value={oportunidadeCredito || ''}
+                    onChange={(e) => setOportunidadeCredito(Number(e.target.value))}
+                    placeholder="0,00"
+                    required
+                    className="w-full bg-white border border-[#E0E5CF] rounded-xl pl-10 pr-3.5 py-2.5 text-sm font-black text-[#00441F] outline-none focus:ring-2 focus:ring-[#00CF7B]"
+                  />
+                </div>
+                {/* Atalhos rápidos de valor */}
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {[50000, 100000, 200000, 300000, 500000, 1000000].map((v) => (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => setOportunidadeCredito(v)}
+                      className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-white border border-[#E0E5CF] text-[#00441F] hover:bg-[#00CF7B]/20 transition-colors cursor-pointer"
+                    >
+                      {formatCurrency(v)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Título Personalizado Opcional */}
+              <div>
+                <label className="block text-[11px] font-bold text-[#00441F]/80 uppercase tracking-wider mb-1">
+                  Título Personalizado (Opcional)
+                </label>
+                <input
+                  type="text"
+                  value={oportunidadeTitulo}
+                  onChange={(e) => setOportunidadeTitulo(e.target.value)}
+                  placeholder="Ex: Expansão de Frota / Compra de Imóvel Comercial"
+                  className="w-full bg-white border border-[#E0E5CF] rounded-xl px-3.5 py-2 text-xs text-[#00441F] outline-none focus:ring-2 focus:ring-[#00CF7B]"
+                />
+              </div>
+
+              {/* Botões do Rodapé */}
+              <div className="pt-3 border-t border-[#E0E5CF] flex justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsNovaOportunidadeOpen(false);
+                    setOportunidadeFeedback(null);
+                  }}
+                  disabled={isSubmittingOportunidade}
+                  className="px-4 py-2 rounded-xl border border-[#E0E5CF] text-xs font-bold text-[#00441F] bg-white hover:bg-gray-50 transition-colors cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingOportunidade}
+                  className="px-5 py-2 rounded-xl bg-[#00CF7B] text-white text-xs font-black shadow-xs hover:bg-[#00441F] transition-all cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  {isSubmittingOportunidade ? (
+                    'Criando...'
+                  ) : (
+                    <>
+                      <Plus className="w-4 h-4" />
+                      Criar Oportunidade
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>

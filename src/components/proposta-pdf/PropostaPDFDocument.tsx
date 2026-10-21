@@ -343,9 +343,11 @@ export const PropostaPDFDocument = ({ data }: PropostaPDFDocumentProps) => {
               </View>
               {data.parcelasFuro !== undefined && data.parcelasFuro > 0 ? (
                 <View style={page4Styles.rowValue}>
-                  <Text style={[page4Styles.label, { color: '#b91c1c', fontWeight: 'bold' }]}>Parcelas Furo</Text>
-                  <Text style={[page4Styles.value, { color: '#b91c1c', fontWeight: 'bold' }]}>
-                    {data.parcelasFuro}x ({data.diluirFuro ? 'Diluído' : 'Na Contemplação'})
+                  <Text style={[page4Styles.label, { color: data.diluirFuro ? '#00CF7B' : '#b91c1c', fontWeight: 'bold' }]}>
+                    Parcelas Furo
+                  </Text>
+                  <Text style={[page4Styles.value, { color: data.diluirFuro ? '#00CF7B' : '#b91c1c', fontWeight: 'bold' }]}>
+                    {data.parcelasFuro}x ({data.diluirFuro ? 'Diluído nas parcelas a vencer' : 'Furo na contemplação, lance ou sorteio'})
                   </Text>
                 </View>
               ) : null}
@@ -475,13 +477,15 @@ export const PropostaPDFDocument = ({ data }: PropostaPDFDocumentProps) => {
                 </View>
               ) : null}
               {data.parcelasFuro !== undefined && data.parcelasFuro > 0 ? (
-                <View style={{ backgroundColor: '#FFF5F5', borderWidth: 1, borderColor: '#FEB2B2', padding: 8, borderRadius: 5, marginTop: 5 }}>
+                <View style={{ backgroundColor: data.diluirFuro ? '#F0FDF4' : '#FFF5F5', borderWidth: 1, borderColor: data.diluirFuro ? '#BBF7D0' : '#FEB2B2', padding: 8, borderRadius: 5, marginTop: 5 }}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Text style={{ fontSize: 7.5, color: '#C53030', textTransform: 'uppercase', fontWeight: 'bold' }}>Parcelas Furo</Text>
-                    <Text style={{ fontSize: 12, fontWeight: 'bold', color: '#9B2C2C' }}>{data.parcelasFuro}x</Text>
+                    <Text style={{ fontSize: 7.5, color: data.diluirFuro ? '#166534' : '#C53030', textTransform: 'uppercase', fontWeight: 'bold' }}>
+                      Parcelas Furo
+                    </Text>
+                    <Text style={{ fontSize: 12, fontWeight: 'bold', color: data.diluirFuro ? '#15803D' : '#9B2C2C' }}>{data.parcelasFuro}x</Text>
                   </View>
-                  <Text style={{ fontSize: 7, color: '#742A2A', marginTop: 2 }}>
-                    {data.diluirFuro ? 'Diluído nas parcelas mensais' : 'Acerto na contemplação'}
+                  <Text style={{ fontSize: 7, color: data.diluirFuro ? '#166534' : '#742A2A', marginTop: 2 }}>
+                    {data.diluirFuro ? 'Diluído nas parcelas a vencer' : 'Furo na contemplação, lance ou sorteio'}
                   </Text>
                 </View>
               ) : (
@@ -576,19 +580,19 @@ export const PropostaPDFDocument = ({ data }: PropostaPDFDocumentProps) => {
         </View>
 
         {data.parcelasFuro !== undefined && data.parcelasFuro > 0 ? (
-          <View style={{ borderLeftWidth: 4, borderLeftColor: '#f59e0b', paddingLeft: 15, backgroundColor: '#fffbeb', padding: 10, borderRadius: 5, marginTop: 8 }}>
+          <View style={{ borderLeftWidth: 4, borderLeftColor: data.diluirFuro ? '#00CF7B' : '#f59e0b', paddingLeft: 15, backgroundColor: data.diluirFuro ? '#f0fdf4' : '#fffbeb', padding: 10, borderRadius: 5, marginTop: 8 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
-              <Text style={{ fontSize: 9.5, fontWeight: 'bold', color: '#92400e' }}>
-                INFORMAÇÃO DAS PARCELAS FURO ({data.parcelasFuro}x)
+              <Text style={{ fontSize: 9.5, fontWeight: 'bold', color: data.diluirFuro ? '#166534' : '#92400e' }}>
+                {`DETALHAMENTO DAS PARCELAS FURO (${data.parcelasFuro}x)`}
               </Text>
-              <Text style={{ fontSize: 8.5, fontWeight: 'bold', color: '#b45309' }}>
-                {data.diluirFuro ? 'Diluição nas Parcelas Mensais' : 'Acerto na Contemplação'}
+              <Text style={{ fontSize: 8.5, fontWeight: 'bold', color: data.diluirFuro ? '#15803D' : '#b45309' }}>
+                {data.diluirFuro ? 'Diluído nas Parcelas a Vencer' : 'Furo na Contemplação, Lance ou Sorteio'}
               </Text>
             </View>
-            <Text style={[styles.textBody, { fontSize: 8.5, textAlign: 'left', color: '#78350f' }]}>
+            <Text style={[styles.textBody, { fontSize: 8.5, textAlign: 'left', color: data.diluirFuro ? '#14532d' : '#78350f' }]}>
               {data.diluirFuro
-                ? `Esta cota possui ${data.parcelasFuro} parcelas de furo diluídas linearmente nas mensalidades contratadas, sem necessidade de desembolso extra na contemplação.`
-                : `Esta cota possui ${data.parcelasFuro} parcelas de furo. Na contemplação, o valor correspondente (${formatCurrency(data.valorFuro || (data.parcelasFuro * (data.parcelaInicial || 0)))}) é quitado integralmente — absorvido pelo lance ofertado ou pago no acerto de contemplação por sorteio.`}
+                ? `Esta cota possui ${data.parcelasFuro} parcelas de furo diluídas linearmente nas parcelas a vencer, sem necessidade de desembolso extra na contemplação.`
+                : `Esta cota possui ${data.parcelasFuro} parcelas de furo. Na contemplação, o valor correspondente (${formatCurrency(data.valorFuro || (data.parcelasFuro * (data.parcelaInicial || 0)))}) é quitado integralmente — furo na contemplação, lance ou sorteio.`}
             </Text>
           </View>
         ) : null}
@@ -722,8 +726,8 @@ export const PropostaPDFDocument = ({ data }: PropostaPDFDocumentProps) => {
                   {data.parcelasFuro !== undefined && data.parcelasFuro > 0 ? (
                     <View>
                       <Text style={{ fontSize: 8, color: '#585f6c', textAlign: 'right' }}>Parcelas Furo</Text>
-                      <Text style={{ fontSize: 10, fontWeight: 'bold', textAlign: 'right', color: '#b91c1c' }}>
-                        {data.parcelasFuro}x ({data.diluirFuro ? 'Diluído' : 'Na Contemp.'})
+                      <Text style={{ fontSize: 9.5, fontWeight: 'bold', textAlign: 'right', color: data.diluirFuro ? '#15803D' : '#b91c1c' }}>
+                        {data.parcelasFuro}x ({data.diluirFuro ? 'Diluído nas parcelas a vencer' : 'Furo na contemplação, lance ou sorteio'})
                       </Text>
                     </View>
                   ) : (
@@ -827,7 +831,7 @@ export const PropostaPDFDocument = ({ data }: PropostaPDFDocumentProps) => {
             <View style={{ backgroundColor: cSecundaria, padding: 10, borderRadius: 5 }}>
               <Text style={{ fontSize: 9.5, color: cPrimaria, fontWeight: 'bold' }}>
                 Esta estratégia foi desenhada para maximizar suas chances de contemplação mantendo a parcela dentro de uma margem segura de fluxo de caixa.
-                {data.parcelasFuro !== undefined && data.parcelasFuro > 0 ? ` Operação estruturada com ${data.parcelasFuro} parcelas de furo (${data.diluirFuro ? 'diluídas linearmente nas mensalidades' : 'com quitação programada na contemplação'}).` : ''}
+                {data.parcelasFuro !== undefined && data.parcelasFuro > 0 ? ` Operação estruturada com ${data.parcelasFuro} parcelas de furo (${data.diluirFuro ? 'diluído nas parcelas a vencer' : 'furo na contemplação, lance ou sorteio'}).` : ''}
               </Text>
             </View>
           </View>

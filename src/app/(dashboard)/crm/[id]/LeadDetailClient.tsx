@@ -407,8 +407,8 @@ export default function LeadDetailClient({
                       <option value="ligacao">Ligação</option>
                       <option value="email">E-mail</option>
                       <option value="whatsapp">WhatsApp</option>
-                      <option value="reuniao">Reunião</option>
-                      <option value="visita">Visita Presencial</option>
+                      <option value="reuniao_online">Reunião Online</option>
+                      <option value="reuniao_presencial">Reunião Presencial</option>
                       <option value="outros">Outros</option>
                     </select>
                   </div>

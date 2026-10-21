@@ -214,27 +214,8 @@ export async function createLeadAction(
       return { success: false, message: `Erro: ${error?.message || 'Sem dados retornados'}` };
     }
 
-    // Criar um negócio inicial
-    const negocioPayload = {
-      empresa_id: resolvedEmpresaId,
-      cliente_id: leadInserido.id,
-      vendedor_id: targetGerenteId,
-      titulo: `${nome} - Novo Contato`,
-      credito: 0,
-      modalidade: 'Geral',
-      etapa_funil: 'novo_lead',
-      origem: origem || null,
-    };
-
-    const { error: negocioError } = await (supabase as any)
-      .from('negocios_crm')
-      .insert(negocioPayload);
-
-    if (negocioError) {
-      console.error('Erro ao criar negócio inicial para o lead:', negocioError);
-    }
-
     revalidatePath('/crm');
+    revalidatePath('/clientes');
     return { success: true, message: 'Lead criado com sucesso!' };
   } catch (err: any) {
     return { success: false, message: `Erro interno: ${err?.message || 'Erro desconhecido'}` };
@@ -367,7 +348,7 @@ export async function updateNegocioStageAction(
     if (propostaId) {
       let novoStatusProposta = '';
       if (newStage === 'proposta_enviada') novoStatusProposta = 'enviada';
-      else if (newStage === 'fechado_ganho') novoStatusProposta = 'aceita';
+      else if (newStage === 'fechado_ganho' || newStage === 'ganho') novoStatusProposta = 'aceita';
       else if (newStage === 'perdido') novoStatusProposta = 'recusada';
 
       if (novoStatusProposta) {
@@ -577,14 +558,26 @@ export async function createNegocioManualAction(
       return { success: false, message: 'Cliente inválido para esta empresa.' };
     }
 
+    let finalTitulo = titulo?.trim();
+    if (!finalTitulo) {
+      const { data: leadData } = await (supabase as any)
+        .from('leads')
+        .select('nome')
+        .eq('id', clienteId)
+        .maybeSingle();
+      const nomeCliente = leadData?.nome || 'Cliente';
+      const produtoNome = modalidade || 'Oportunidade';
+      finalTitulo = `${nomeCliente} - ${produtoNome} - R$ ${Number(credito || 0).toLocaleString('pt-BR')}`;
+    }
+
     const negocioPayload = {
       empresa_id: user.empresa_id || '43605699-aaf9-4caf-872a-2526e728ddd6',
       cliente_id: clienteId,
       vendedor_id: user.id,
-      titulo,
+      titulo: finalTitulo,
       credito,
       modalidade: modalidade || 'Geral',
-      etapa_funil: etapaFunil || 'novo_lead',
+      etapa_funil: etapaFunil || 'oportunidades',
     };
 
     const { error: negocioError } = await (supabase as any)

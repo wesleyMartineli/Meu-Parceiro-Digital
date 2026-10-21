@@ -23,6 +23,7 @@ export async function saveSimulacaoAction(
     modalidade: string; // 'linear', 'multi_cotas', etc
     simulacaoResult: SimulacaoResult;
     inputsOriginal: any; // O array de inputs digitados
+    oportunidadeId?: string | null;
   }
 ): Promise<SimulacaoActionState> {
   try {
@@ -40,6 +41,7 @@ export async function saveSimulacaoAction(
       modalidade,
       simulacaoResult,
       inputsOriginal,
+      oportunidadeId,
     } = payload;
 
     const supabase = await createClient();
@@ -139,16 +141,80 @@ export async function saveSimulacaoAction(
       };
     }
 
-    // Registrar o log de auditoria
+    // Registrar o log de auditoria e atualizar CRM
     if (leadId) {
       await (supabase as any).from('audit_logs').insert({
-        
         usuario_id: user.id,
         acao: 'CRIAR',
         entidade: 'simulacoes',
         entidade_id: simulacaoId,
         payload: { lead_id: leadId, credito_total: simulacaoResult.totalCreditoBruto },
       });
+
+      // Atualizar ou criar negócio no CRM na etapa simulacao_criada
+      try {
+        let targetNegocioId = oportunidadeId || null;
+
+        if (!targetNegocioId) {
+          const { data: openOportunidade } = await (supabase.from('negocios_crm') as any)
+            .select('id')
+            .eq('cliente_id', leadId)
+            .eq('etapa_funil', 'oportunidades')
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (openOportunidade?.id) {
+            targetNegocioId = openOportunidade.id;
+          }
+        }
+
+        const { data: leadData } = await (supabase.from('leads') as any)
+          .select('nome, temperatura, origem')
+          .eq('id', leadId)
+          .maybeSingle();
+
+        const leadNome = leadData?.nome || 'Cliente';
+        const titulo = `${leadNome} - ${produto} - R$ ${simulacaoResult.totalCreditoBruto.toLocaleString('pt-BR')}`;
+
+        let adminNome = '';
+        if (realAdministradoraId) {
+          const { data: adminData } = await (supabase.from('administradoras') as any)
+            .select('nome')
+            .eq('id', realAdministradoraId)
+            .maybeSingle();
+          if (adminData?.nome) adminNome = adminData.nome;
+        }
+
+        if (targetNegocioId) {
+          await (supabase.from('negocios_crm') as any)
+            .update({
+              titulo: titulo,
+              credito: simulacaoResult.totalCreditoBruto,
+              modalidade: modalidade,
+              administradora: adminNome,
+              etapa_funil: 'simulacao_criada',
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', targetNegocioId);
+        } else {
+          await (supabase.from('negocios_crm') as any)
+            .insert({
+              empresa_id: user.empresa_id || '43605699-aaf9-4caf-872a-2526e728ddd6',
+              cliente_id: leadId,
+              vendedor_id: user.id,
+              titulo: titulo,
+              credito: simulacaoResult.totalCreditoBruto,
+              modalidade: modalidade,
+              administradora: adminNome,
+              etapa_funil: 'simulacao_criada',
+              temperatura: leadData?.temperatura || 'morno',
+              origem: leadData?.origem || 'sistema',
+            });
+        }
+      } catch (crmErr) {
+        console.error('Erro ao atualizar estágio do CRM na simulação:', crmErr);
+      }
       
       revalidatePath(`/crm/${leadId}`);
     }

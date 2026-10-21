@@ -126,8 +126,7 @@ export default async function CRMPage() {
           produto
         )
       )
-    `)
-    .neq('etapa_funil', 'novo_lead');
+    `);
 
   // Aplica filtro de escopo por hierarquia
   if (allowedUserIds !== null) {
@@ -144,11 +143,29 @@ export default async function CRMPage() {
     console.error('Erro ao carregar negócios:', error);
   }
 
+  // 4. Buscar parceiros/leads disponíveis para criação de novas oportunidades
+  let leadsQuery = supabase
+    .from('leads')
+    .select('id, nome, telefone, email')
+    .eq('empresa_id', empresaId)
+    .order('nome', { ascending: true });
+
+  if (allowedUserIds !== null) {
+    if (allowedUserIds.length === 1) {
+      leadsQuery = leadsQuery.eq('vendedor_id', allowedUserIds[0]);
+    } else {
+      leadsQuery = leadsQuery.in('vendedor_id', allowedUserIds);
+    }
+  }
+
+  const { data: todosLeads } = await leadsQuery;
+
   return (
     <MeusNegociosClient
       negocios={(negocios as any) || []}
       gerentes={usuariosHierarquia}
       usuariosHierarquia={usuariosHierarquia}
+      clientesDisponiveis={(todosLeads as any) || []}
       currentUser={{
         id: user.id,
         role: user.role,

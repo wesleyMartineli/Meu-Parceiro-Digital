@@ -6,7 +6,7 @@
  * e priorização comercial sem dependência de LLM externa.
  */
 
-export type FollowupTipo = 'ligacao' | 'whatsapp' | 'reuniao' | 'visita' | 'email' | 'outros';
+export type FollowupTipo = 'ligacao' | 'whatsapp' | 'reuniao' | 'visita' | 'reuniao_online' | 'reuniao_presencial' | 'email' | 'outros';
 
 export type PrioridadeNivel = 'alta' | 'media' | 'baixa';
 
@@ -114,8 +114,10 @@ export interface ClosingConfig {
 const TIPO_LABELS: Record<FollowupTipo, string> = {
   ligacao: 'Ligação',
   whatsapp: 'WhatsApp',
-  reuniao: 'Reunião Virtual',
-  visita: 'Visita Presencial',
+  reuniao_online: 'Reunião Online',
+  reuniao_presencial: 'Reunião Presencial',
+  reuniao: 'Reunião Online',
+  visita: 'Reunião Presencial',
   email: 'E-mail',
   outros: 'Outros',
 };
@@ -124,12 +126,13 @@ const TIPO_LABELS: Record<FollowupTipo, string> = {
  * Verifica se uma tarefa é uma reunião/visita presencial
  */
 export function isPresencialMeeting(task: { tipo?: string; titulo?: string; descricao?: string | null }): boolean {
-  if (task.tipo === 'visita') return true;
+  if (task.tipo === 'visita' || task.tipo === 'reuniao_presencial') return true;
   const texto = `${task.titulo || ''} ${task.descricao || ''}`.toLowerCase();
   return (
     texto.includes('visita') ||
     texto.includes('presencial') ||
     texto.includes('visita comercial') ||
+    texto.includes('reuniao presencial') ||
     texto.includes('ir ate')
   );
 }
@@ -218,8 +221,8 @@ export function analyzeDateCapacity(
     totalTasksCount: totalCount,
     capacityLevel: totalCount >= 8 ? 'restricted' : 'available',
     maxNewTasksAllowed: Math.max(0, 8 - totalCount),
-    allowedTipos: ['ligacao', 'whatsapp', 'reuniao', 'visita', 'email'],
-    reason: `Dia sem reuniões presenciais. Agenda com boa capacidade para ligações, visitas ou reuniões comerciais.`,
+    allowedTipos: ['ligacao', 'whatsapp', 'reuniao_online', 'reuniao_presencial', 'reuniao', 'visita', 'email'],
+    reason: `Dia sem reuniões presenciais. Agenda com boa capacidade para ligações, reuniões presenciais ou online.`,
   };
 }
 
@@ -501,7 +504,7 @@ export function generateCommercialRecommendations(input: EngineInputData): {
   // Identifica tarefas de tipo reunião ou visita concluídas nos últimos 3 dias sem tarefa subsequente
   const recentMeetings = existingTasks.filter(t => {
     if (!t.leads?.id) return false;
-    const isMeeting = t.tipo === 'reuniao' || t.tipo === 'visita';
+    const isMeeting = t.tipo === 'reuniao' || t.tipo === 'visita' || t.tipo === 'reuniao_online' || t.tipo === 'reuniao_presencial';
     const taskDate = new Date(t.data_followup);
     const diffHours = (now.getTime() - taskDate.getTime()) / (1000 * 60 * 60);
     return isMeeting && diffHours >= 0 && diffHours <= 72; // Últimas 72h

@@ -370,7 +370,7 @@ export default function PropostaDetalheClient({ proposta }: PropostaDetalheClien
                   <div className="flex justify-between">
                     <span className="text-xs text-[#00441F] font-semibold">Parcelas Furo</span>
                     <span className="font-bold text-red-600 text-xs">
-                      {proposta.simulacao.input_json.parcelasFuro}x ({proposta.simulacao.input_json.diluirFuro ? "Diluído" : "Na Contemplação"})
+                      {proposta.simulacao.input_json.parcelasFuro}x ({proposta.simulacao.input_json.diluirFuro ? "Diluído nas parcelas a vencer" : "Furo na contemplação, lance ou sorteio"})
                     </span>
                   </div>
                 )}

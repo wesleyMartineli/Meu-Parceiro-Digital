@@ -8,7 +8,7 @@ import React, {
   useMemo,
   useRef,
 } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { z } from "zod";
 import { calcularCota } from "@/core/calculator/calculatorEngine";
@@ -523,6 +523,32 @@ export default function SimuladorClient({
   }, [leads]);
 
   const [leadId, setLeadId] = useState("");
+  const [oportunidadeId, setOportunidadeId] = useState<string | null>(null);
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    if (!searchParams) return;
+    const pLeadId = searchParams.get("leadId") || searchParams.get("clienteId");
+    const pProduto = searchParams.get("produto");
+    const pCredito = searchParams.get("credito") || searchParams.get("valor");
+    const pOportunidadeId = searchParams.get("oportunidadeId");
+
+    if (pOportunidadeId) {
+      setOportunidadeId(pOportunidadeId);
+    }
+    if (pLeadId) {
+      setLeadId(pLeadId);
+    }
+    if (pProduto && ["imovel", "auto", "pesado", "servico", "moto"].includes(pProduto)) {
+      setProduto(pProduto);
+    }
+    if (pCredito) {
+      const val = Number(pCredito);
+      if (!isNaN(val) && val > 0) {
+        setCredito(val);
+      }
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (leadId) {
@@ -536,6 +562,7 @@ export default function SimuladorClient({
   const [produto, setProduto] = useState("imovel");
   const produtoConfig =
     PRODUTOS.find((p) => p.value === produto) || PRODUTOS[3];
+  const semEmbutido = produto === "moto" || produto === "servico";
 
   // 👉 Step 3: Financial Inputs
   const [credito, setCredito] = useState(400000);
@@ -789,6 +816,13 @@ export default function SimuladorClient({
     }
   }, [isRodobens]);
 
+  // ── Moto e Serviço: não permitem lance embutido (trava em 0)
+  useEffect(() => {
+    if (semEmbutido) {
+      setLanceEmbutido(0);
+    }
+  }, [semEmbutido]);
+
   // ── Cálculo reativo
   useEffect(() => {
     if (!administradoraId) {
@@ -806,7 +840,7 @@ export default function SimuladorClient({
       fundoReserva,
       seguro,
       percentualReducao: !isRodobens && modalidade === "reduzida" ? reducaoCustomizada : undefined,
-      lanceEmbutido: (tipoContemplacao === "sorteio" || tipoLance === "nenhum") ? 0 : lanceEmbutido,
+      lanceEmbutido: (tipoContemplacao === "sorteio" || tipoLance === "nenhum" || semEmbutido) ? 0 : lanceEmbutido,
       recursosProprios: (tipoContemplacao === "sorteio" || tipoLance === "nenhum") ? 0 : recursosProprios,
       tipoLance: (tipoContemplacao === "sorteio" || tipoLance === "nenhum") ? "%" : tipoLance,
       quantidadeParcelasLance:
@@ -925,6 +959,7 @@ export default function SimuladorClient({
       modalidade: isRodobens ? modalidade : "linear",
       simulacaoResult: simulacaoResultData,
       inputsOriginal: inputData,
+      oportunidadeId: oportunidadeId || null,
     });
 
     if (res.success && res.simulacaoId) {
@@ -954,6 +989,7 @@ export default function SimuladorClient({
     mesContemplacao,
     mesPontual,
     leadId,
+    oportunidadeId,
     administradoraId,
     engineKey,
     produto,
@@ -966,18 +1002,25 @@ export default function SimuladorClient({
   ]);
 
   const handleSaveSimulacao = useCallback(async () => {
+    if (!leadId) {
+      setFeedback({
+        success: false,
+        message: "⚠️ Por favor, selecione um Parceiro antes de salvar a simulação.",
+      });
+      return;
+    }
     startTransition(async () => {
       setFeedback(null);
       const simId = await saveSimulacao();
       if (simId) {
         setFeedback({
           success: true,
-          message: "✅ Simulação gravada com sucesso!",
+          message: "✅ Simulação gravada com sucesso! Movida para 'Simulação Criada' no CRM.",
         });
         router.refresh();
       }
     });
-  }, [saveSimulacao, router]);
+  }, [leadId, saveSimulacao, router]);
 
   // ── Geração do PDF da Proposta
   const generatePDF = useCallback(async (simId: string): Promise<string> => {
@@ -1114,6 +1157,7 @@ export default function SimuladorClient({
         leadId,
         simulacaoId: simId,
         pdfBase64,
+        oportunidadeId: oportunidadeId || null,
       });
 
       if (res.success && res.propostaId) {
@@ -1137,7 +1181,7 @@ export default function SimuladorClient({
     } finally {
       setIsGeneratingPDF(false);
     }
-  }, [leadId, savedSimulacaoId, saveSimulacao, generatePDF, router]);
+  }, [leadId, oportunidadeId, savedSimulacaoId, saveSimulacao, generatePDF, router]);
 
   const handleCopiarPropostaSimplificada = useCallback(async () => {
     if (!leadId) {
@@ -1215,6 +1259,7 @@ export default function SimuladorClient({
           simulacaoId: simId,
           pdfBase64: base64data,
           fileType: 'png',
+          oportunidadeId: oportunidadeId || null,
         });
 
         if (res.success) {
@@ -1243,7 +1288,7 @@ export default function SimuladorClient({
       setIsGeneratingPNG(false);
       setIsPersonalizarModalOpen(false);
     }
-  }, [leadId, savedSimulacaoId, saveSimulacao, produto, router]);
+  }, [leadId, oportunidadeId, savedSimulacaoId, saveSimulacao, produto, router]);
 
   // (Auxiliary calculations moved to top of component)
 
@@ -1753,14 +1798,17 @@ const leadObj = leads?.find((l) => l.id === leadId);
                       label="Percentual Total Ofertado (%)"
                       value={Number(lanceEmbutido) + Number(recursosProprios)}
                       onChange={(val) => {
-                        setLanceEmbutido(Math.min(val, 30));
-                        setRecursosProprios(Math.max(0, val - 30));
+                        const maxEmbutido = semEmbutido ? 0 : 30;
+                        setLanceEmbutido(Math.min(val, maxEmbutido));
+                        setRecursosProprios(Math.max(0, val - maxEmbutido));
                       }}
                       step={1}
                       max={100}
                     />
                     <p className="text-[10px] text-[#002E17] font-semibold font-medium leading-relaxed">
-                      O sistema preenche automaticamente até 30% no Lance Embutido e aloca o restante em Recursos Próprios.
+                      {semEmbutido
+                        ? `Para consórcio de ${produtoConfig.label}, o Lance Embutido não é permitido (0%). Toda a oferta é alocada em Recursos Próprios.`
+                        : "O sistema preenche automaticamente até 30% no Lance Embutido e aloca o restante em Recursos Próprios."}
                     </p>
                   </div>
                 )}
@@ -1773,15 +1821,17 @@ const leadObj = leads?.find((l) => l.id === leadId);
                       value={((credito * lanceEmbutido) / 100) + Number(recursosProprios)}
                       onChange={(val) => {
                         const total = Math.max(0, val);
-                        const maxEmbutidoRs = credito * 0.30;
+                        const maxEmbutidoRs = semEmbutido ? 0 : credito * 0.30;
                         const embutidoRs = Math.min(total, maxEmbutidoRs);
-                        setLanceEmbutido((embutidoRs / credito) * 100);
+                        setLanceEmbutido(credito > 0 ? (embutidoRs / credito) * 100 : 0);
                         setRecursosProprios(Math.max(0, total - embutidoRs));
                       }}
                       placeholder="0,00"
                     />
                     <p className="text-[10px] text-[#002E17] font-semibold font-medium leading-relaxed">
-                      O sistema aloca automaticamente até 30% do crédito no Lance Embutido e o restante em Recursos Próprios.
+                      {semEmbutido
+                        ? `Para consórcio de ${produtoConfig.label}, o Lance Embutido não é permitido (R$ 0,00). Toda a oferta é alocada em Recursos Próprios.`
+                        : "O sistema aloca automaticamente até 30% do crédito no Lance Embutido e o restante em Recursos Próprios."}
                     </p>
                   </div>
                 )}
@@ -1807,11 +1857,11 @@ const leadObj = leads?.find((l) => l.id === leadId);
                             } else {
                               const baseSeguroUI = credito + (credito * (taxaAdm / 100)) + (credito * (fundoReserva / 100));
                               const parcelaBase = ((credito / prazo) + (credito * (taxaAdm / 100) / prazo) + (credito * (fundoReserva / 100) / prazo) + (baseSeguroUI * (seguro / 100)));
-                              const maxEmbutidoRs = credito * 0.30;
+                              const maxEmbutidoRs = semEmbutido ? 0 : credito * 0.30;
                               const maxEmbutidoParcelas = maxEmbutidoRs / parcelaBase;
                               const embutidoParcelas = Math.min(total, maxEmbutidoParcelas);
                               const embutidoRs = embutidoParcelas * parcelaBase;
-                              setLanceEmbutido((embutidoRs / credito) * 100);
+                              setLanceEmbutido(credito > 0 ? (embutidoRs / credito) * 100 : 0);
                               setQuantidadeParcelasLance(Math.max(0, Math.round(total - embutidoParcelas)));
                             }
                           }}
@@ -1826,14 +1876,25 @@ const leadObj = leads?.find((l) => l.id === leadId);
             {/* Embutido — SEMPRE em % (máx 30%) */}
                 <div className="space-y-1">
                   <div>
-                    <label className="block text-[10px] font-semibold text-[#002E17] uppercase tracking-wider mb-1.5">
-                      Lance Embutido (máx 30%)
+                    <label className="block text-[10px] font-semibold text-[#002E17] uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                      <span>Lance Embutido {semEmbutido ? `(Não permitido para ${produtoConfig.label})` : "(máx 30%)"}</span>
+                      {semEmbutido && (
+                        <span className="text-amber-800 bg-amber-100 font-bold px-2 py-0.5 rounded-md text-[9px] uppercase tracking-wider">
+                          Travado em 0%
+                        </span>
+                      )}
                     </label>
-                    <div className="relative flex items-center bg-[#e9ebe4] rounded-xl border border-[#E0E5CF] focus-within:border-[#00CF7B] focus-within:ring-2 focus-within:ring-[#00CF7B]/10 transition-all overflow-hidden">
+                    <div className={`relative flex items-center rounded-xl border transition-all overflow-hidden ${
+                      semEmbutido
+                        ? "bg-gray-100/80 border-gray-200 cursor-not-allowed opacity-75"
+                        : "bg-[#e9ebe4] border-[#E0E5CF] focus-within:border-[#00CF7B] focus-within:ring-2 focus-within:ring-[#00CF7B]/10"
+                    }`}>
                       <input
                         type="number"
-                        value={lanceEmbutido === 0 ? "" : lanceEmbutido}
+                        disabled={semEmbutido}
+                        value={semEmbutido ? 0 : (lanceEmbutido === 0 ? "" : lanceEmbutido)}
                         onChange={(e) => {
+                          if (semEmbutido) return;
                           let val = Number(e.target.value);
                           if (val < 0) val = 0;
                           if (val > 30) val = 30;
@@ -1860,12 +1921,14 @@ const leadObj = leads?.find((l) => l.id === leadId);
                           setLanceEmbutido(val);
                         }}
                         placeholder="0"
-                        className="w-full bg-transparent px-3 py-2.5 text-sm font-semibold text-[#002E17] outline-none placeholder:text-gray-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        className={`w-full bg-transparent px-3 py-2.5 text-sm font-semibold text-[#002E17] outline-none placeholder:text-gray-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
+                          semEmbutido ? "cursor-not-allowed text-gray-500 font-medium" : ""
+                        }`}
                       />
                       <span className="absolute right-3 text-[#002E17] font-bold text-sm pointer-events-none">%</span>
                     </div>
                   </div>
-                  {(tipoLance === "valor" || tipoLance === "parcelas") && lanceEmbutido > 0 && (
+                  {!semEmbutido && (tipoLance === "valor" || tipoLance === "parcelas") && lanceEmbutido > 0 && (
                     <p className="text-[10px] text-[#00CF7B] font-semibold px-1 mt-1">
                       {lanceEmbutido}% Equivale a {tipoLance === "valor" 
                         ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(credito * (lanceEmbutido / 100))
@@ -2165,12 +2228,23 @@ const leadObj = leads?.find((l) => l.id === leadId);
                         </div>
                         <div className="flex justify-between items-center border-b border-white/5 pb-2">
                           <div className="flex flex-col">
-                            <span className="text-xs font-semibold opacity-80 text-gray-300">Prazo</span>
+                            <span className="text-xs font-semibold opacity-80 text-gray-300">Prazo (Parcelas a Vencer)</span>
                             <span className="text-base font-extrabold text-white">{prazo} meses</span>
                           </div>
                           <div className="flex flex-col text-right">
-                            <span className="text-xs font-semibold opacity-80 text-gray-300">Parcelas Furo</span>
+                            <span className="text-xs font-semibold opacity-80 text-gray-300">
+                              Parcelas Furo
+                            </span>
                             <span className="text-base font-extrabold text-white">{parcelasFuro || 0}</span>
+                            {diluirFuro ? (
+                              <span className="text-[10px] md:text-[11px] font-bold text-[#00CF7B] mt-0.5">
+                                Diluído nas parcelas a vencer
+                              </span>
+                            ) : parcelasFuro > 0 ? (
+                              <span className="text-[10px] md:text-[11px] font-bold text-amber-400 mt-0.5">
+                                Furo na contemplação, lance ou sorteio
+                              </span>
+                            ) : null}
                           </div>
                         </div>
                         
@@ -2373,12 +2447,23 @@ const leadObj = leads?.find((l) => l.id === leadId);
                           </div>
                           <div className="flex justify-between items-center border-b border-white/5 pb-2">
                             <div className="flex flex-col">
-                              <span className="text-xs font-semibold opacity-80 text-gray-300">Prazo</span>
+                              <span className="text-xs font-semibold opacity-80 text-gray-300">Prazo (Parcelas a Vencer)</span>
                               <span className="text-base font-extrabold text-white">{prazo} meses</span>
                             </div>
                             <div className="flex flex-col text-right">
-                              <span className="text-xs font-semibold opacity-80 text-gray-300">Parcelas Furo</span>
+                              <span className="text-xs font-semibold opacity-80 text-gray-300">
+                                Parcelas Furo
+                              </span>
                               <span className="text-base font-extrabold text-white">{parcelasFuro || 0}</span>
+                              {diluirFuro ? (
+                                <span className="text-[10px] md:text-[11px] font-bold text-[#00CF7B] mt-0.5">
+                                  Diluído nas parcelas a vencer
+                                </span>
+                              ) : parcelasFuro > 0 ? (
+                                <span className="text-[10px] md:text-[11px] font-bold text-amber-400 mt-0.5">
+                                  Furo na contemplação, lance ou sorteio
+                                </span>
+                              ) : null}
                             </div>
                           </div>
                           
@@ -2532,6 +2617,7 @@ const leadObj = leads?.find((l) => l.id === leadId);
                   <div className="space-y-3 mt-2 flex flex-col items-end">
                     <div className="w-full max-w-sm flex gap-3">
                       <button
+                        type="button"
                         onClick={() => {
                           handleCopiarPropostaSimplificada();
                         }}
@@ -2541,6 +2627,7 @@ const leadObj = leads?.find((l) => l.id === leadId);
                         {isGeneratingPNG ? "Copiando..." : "Copiar Simplificada"}
                       </button>
                       <button
+                        type="button"
                         onClick={() => {
                           if (!leadId) {
                             setFeedback({ success: false, message: "⚠️ Por favor, selecione um parceiro." });

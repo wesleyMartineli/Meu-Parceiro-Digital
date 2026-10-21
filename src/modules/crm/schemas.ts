@@ -37,7 +37,21 @@ export const updateLeadSchema = createLeadSchema.omit({ etapaFunil: true });
 export const updateNegocioStageSchema = z.object({
   negocioId: negocioIdSchema,
   newStage: z.enum(
-    ['em_atendimento', 'qualificacao', 'simulacao_apresentada', 'proposta_enviada', 'negociacao', 'ganho', 'perdido'],
+    [
+      'oportunidades',
+      'simulacao_criada',
+      'proposta_enviada',
+      'negociacao',
+      'pre_fechamento',
+      'fechado_ganho',
+      'perdido',
+      'novo_lead',
+      'em_atendimento',
+      'qualificacao',
+      'simulacao_apresentada',
+      'ganho',
+      'fechado',
+    ],
     { message: 'Etapa inválida.' },
   ),
   propostaId: z.string().uuid('ID de proposta inválido.').nullable().optional(),
@@ -70,7 +84,7 @@ export const toggleFollowupStatusSchema = z.object({
 
 export const createNegocioManualSchema = z.object({
   clienteId: leadIdSchema,
-  titulo: z.string().trim().min(1, 'O título do negócio é obrigatório.').max(255, 'Título muito longo.'),
+  titulo: z.string().trim().max(255, 'Título muito longo.').nullable().optional(),
   modalidade: z.string().max(50, 'Modalidade muito longa.').nullable().optional(),
   credito: z.number().min(0, 'Crédito não pode ser negativo.').finite('Crédito inválido.'),
   etapaFunil: z.string().max(50).nullable().optional(),

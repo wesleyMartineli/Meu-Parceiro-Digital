@@ -171,8 +171,8 @@ export default function NovaTarefaModal({ isOpen, onClose, leads }: NovaTarefaMo
                   <option value="ligacao">Ligação</option>
                   <option value="email">E-mail</option>
                   <option value="whatsapp">WhatsApp</option>
-                  <option value="reuniao">Reunião</option>
-                  <option value="visita">Visita Presencial</option>
+                  <option value="reuniao_online">Reunião Online</option>
+                  <option value="reuniao_presencial">Reunião Presencial</option>
                   <option value="outros">Outros</option>
                 </select>
                 <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-[#00441F] font-semibold">

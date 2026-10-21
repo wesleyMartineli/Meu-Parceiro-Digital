@@ -70,7 +70,6 @@ export default async function DashboardPage() {
       )
     `)
     .eq("empresa_id", empresaId)
-    .neq("etapa_funil", "novo_lead")
     .order("created_at", { ascending: false });
 
   if (user.role === "gerente_negocio") {

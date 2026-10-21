@@ -20,6 +20,7 @@ export async function createPropostaAction(payload: {
   simulacaoId: string;
   pdfBase64: string; // PDF ou PNG codificado em base64 vindo do cliente
   fileType?: 'pdf' | 'png';
+  oportunidadeId?: string | null;
 }): Promise<PropostaActionState> {
   try {
     const user = await getCurrentUser();
@@ -33,7 +34,7 @@ export async function createPropostaAction(payload: {
       return { success: false, message: parsed.error.issues[0].message };
     }
 
-    const { leadId, simulacaoId, pdfBase64, fileType = 'pdf' } = parsed.data;
+    const { leadId, simulacaoId, pdfBase64, fileType = 'pdf', oportunidadeId } = parsed.data;
     const supabase = await createClient();
 
     // 1. Decodificar o base64 para Buffer (removendo prefixo data URI se existir) e validar
@@ -171,27 +172,63 @@ export async function createPropostaAction(payload: {
 
         const titulo = `${lead.nome} - ${sim.produto} - R$ ${sim.credito_total.toLocaleString('pt-BR')}`;
         
-        const { data: newNegocio, error: negocioError } = await (supabase.from('negocios_crm') as any)
-          .insert({
-            empresa_id: user.empresa_id || '43605699-aaf9-4caf-872a-2526e728ddd6',
-            cliente_id: leadId,
-            proposta_id: propostaId,
-            vendedor_id: user.id,
-            titulo: titulo,
-            credito: sim.credito_total,
-            modalidade: sim.modalidade,
-            administradora: adminNome,
-            etapa_funil: 'simulacao_apresentada',
-            temperatura: lead.temperatura,
-            origem: lead.origem,
-          })
-          .select('id')
-          .single();
+        let targetOportunidadeId = oportunidadeId || null;
 
-        if (newNegocio && newNegocio.id) {
-          // Atualiza a proposta com o negocio_id recém-criado
+        if (!targetOportunidadeId) {
+          // Verificar se já existe uma oportunidade aberta para este cliente sem proposta vinculada
+          const { data: existingOportunidade } = await (supabase.from('negocios_crm') as any)
+            .select('id')
+            .eq('cliente_id', leadId)
+            .is('proposta_id', null)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          targetOportunidadeId = existingOportunidade?.id || null;
+        }
+
+        let negocioId: string | null = null;
+
+        if (targetOportunidadeId) {
+          // Atualiza a oportunidade existente para Simulação Criada
+          await (supabase.from('negocios_crm') as any)
+            .update({
+              proposta_id: propostaId,
+              titulo: titulo,
+              credito: sim.credito_total,
+              modalidade: sim.modalidade,
+              administradora: adminNome,
+              etapa_funil: 'simulacao_criada',
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', targetOportunidadeId);
+          negocioId = targetOportunidadeId;
+        } else {
+          // Cria novo negócio já na etapa Simulação Criada
+          const { data: newNegocio } = await (supabase.from('negocios_crm') as any)
+            .insert({
+              empresa_id: user.empresa_id || '43605699-aaf9-4caf-872a-2526e728ddd6',
+              cliente_id: leadId,
+              proposta_id: propostaId,
+              vendedor_id: user.id,
+              titulo: titulo,
+              credito: sim.credito_total,
+              modalidade: sim.modalidade,
+              administradora: adminNome,
+              etapa_funil: 'simulacao_criada',
+              temperatura: lead.temperatura,
+              origem: lead.origem,
+            })
+            .select('id')
+            .single();
+
+          negocioId = newNegocio?.id || null;
+        }
+
+        if (negocioId) {
+          // Atualiza a proposta com o negocio_id recém-criado ou atualizado
           await (supabase.from('propostas') as any)
-            .update({ negocio_id: newNegocio.id })
+            .update({ negocio_id: negocioId })
             .eq('id', propostaId);
         }
       }

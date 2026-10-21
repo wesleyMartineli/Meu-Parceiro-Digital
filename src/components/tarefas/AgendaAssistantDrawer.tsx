@@ -20,8 +20,8 @@ interface AgendaAssistantDrawerProps {
 const TIPO_OPTIONS: { id: FollowupTipo; label: string; icon: string }[] = [
   { id: 'ligacao', label: 'Ligação', icon: '📞' },
   { id: 'whatsapp', label: 'WhatsApp', icon: '💬' },
-  { id: 'reuniao', label: 'Reunião', icon: '👥' },
-  { id: 'visita', label: 'Visita Presencial', icon: '🚗' },
+  { id: 'reuniao_online', label: 'Reunião Online', icon: '💻' },
+  { id: 'reuniao_presencial', label: 'Reunião Presencial', icon: '👥' },
   { id: 'email', label: 'E-mail', icon: '✉️' },
   { id: 'outros', label: 'Outros', icon: '📌' },
 ];

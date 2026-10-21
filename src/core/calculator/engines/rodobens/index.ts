@@ -40,15 +40,19 @@ export function calcularCotaRodobens(input: SimulacaoInput): CotaResult {
 
   const parcelaInicialRef = FC_plano + TA_plano_inicial + FR_plano_linear + SE_plano_linear;
 
+  const parcelasFuro = input.parcelasFuro || 0;
+  const furoReais = parcelasFuro * parcelaInicialRef;
+  const adicionalFuroDiluido = (input.diluirFuro && furoReais > 0) ? (furoReais / prazo) : 0;
+
   // 2. Calcular Lance Total
   // A parcela base do grupo continua existindo para fins de referência (ex: fundo reserva, conversões visuais)
   const baseSeguroGrupo = credito + (credito * (taxaAdm / 100)) + (credito * (fundoReserva / 100));
   const seguroMensalGrupo = baseSeguroGrupo * (seguro / 100);
   const parcelaBaseGrupo = (credito / prazoMaxGrupo) + ((credito * (taxaAdm / 100)) / prazoMaxGrupo) + ((credito * (fundoReserva / 100)) / prazoMaxGrupo) + seguroMensalGrupo;
 
-  // O Lance Total na Rodobens é SEMPRE ofertado em cima da Parcela Cheia (Integral 100%) da Cota,
-  // mesmo se o cliente estiver num plano reduzido (Linear 70%, Degrau, etc).
-  const parcelaCheiaCota = FC_plano + TA_plano_linear + FR_plano_linear + SE_plano_linear;
+  // O Lance Total na Rodobens é ofertado em cima da Parcela Cheia (Integral 100%) da Cota.
+  // Quando há diluição do furo nas parcelas a vencer, a parcela base do lance incorpora o valor do furo diluído.
+  const parcelaCheiaCota = FC_plano + TA_plano_linear + FR_plano_linear + SE_plano_linear + adicionalFuroDiluido;
 
   let lanceTotalReais = 0;
   if (modalidade === 'pontual') {
@@ -59,15 +63,15 @@ export function calcularCotaRodobens(input: SimulacaoInput): CotaResult {
     lanceTotalReais = credito * (((recursosProprios || 0) + (lanceEmbutido || 0)) / 100);
   } else if (tipoLance === 'parcelas' || !tipoLance) {
     // A quantidade de parcelas informada pelo usuário já é a quantidade no prazo da cota.
-    // Portanto, o lance total é simplesmente a quantidade × parcela da cota.
+    // Portanto, o lance total é simplesmente a quantidade × parcela da cota (já com furo diluído se aplicável).
     const qParcelasCota = quantidadeParcelasLance || 0;
     
     if (modalidade === 'degrau' || modalidade === 'degrau_70' || modalidade === 'degrau_50') {
       const meioPrazo = Math.ceil(prazo / 2);
       const TA_dobrada = (credito * (taxaAdm / 100)) / meioPrazo;
       
-      const parcelaInicialDegrau = FC_plano + TA_dobrada + FR_plano_linear + SE_plano_linear;
-      const parcelaFinalDegrau = FC_plano + FR_plano_linear + SE_plano_linear;
+      const parcelaInicialDegrau = FC_plano + TA_dobrada + FR_plano_linear + SE_plano_linear + adicionalFuroDiluido;
+      const parcelaFinalDegrau = FC_plano + FR_plano_linear + SE_plano_linear + adicionalFuroDiluido;
 
       if (qParcelasCota > meioPrazo) {
         lanceTotalReais = (parcelaFinalDegrau * meioPrazo) + (parcelaInicialDegrau * (qParcelasCota - meioPrazo));
@@ -83,10 +87,7 @@ export function calcularCotaRodobens(input: SimulacaoInput): CotaResult {
     }
   }
 
-  const parcelasFuro = input.parcelasFuro || 0;
-  const furoReais = parcelasFuro * parcelaInicialRef;
-
-  // Regra solicitada: O valor do lance deve cobrir o furo. 
+  // Regra solicitada: O valor do lance deve cobrir o furo quando não diluído. 
   // Se o lance ofertado for menor que o furo, o cliente paga de lance a quantidade dos furos.
   if (!input.diluirFuro && lanceTotalReais < furoReais) {
     lanceTotalReais = furoReais;
@@ -128,7 +129,7 @@ export function calcularCotaRodobens(input: SimulacaoInput): CotaResult {
   }
 
   if (lanceParaPrazo > 0) {
-    let valorParcelaFinal = FC_plano + FR_plano_linear + SE_plano_linear;
+    let valorParcelaFinal = FC_plano + FR_plano_linear + SE_plano_linear + adicionalFuroDiluido;
     if (modalidade !== 'degrau' && modalidade !== 'degrau_70' && modalidade !== 'degrau_50') {
       valorParcelaFinal += TA_plano_linear;
     }
@@ -303,7 +304,7 @@ export function calcularCotaRodobens(input: SimulacaoInput): CotaResult {
     parcelaInicial: Number(parcelaInicial.toFixed(2)),
     parcelaFinal: Number(parcelaFinal.toFixed(2)),
     parcelaPosContemplacaoInicial: parcelaPosContemplacaoInicial ? Number(parcelaPosContemplacaoInicial.toFixed(2)) : undefined,
-    parcelaFinalNormal: (modalidade === 'degrau' || modalidade === 'degrau_70' || modalidade === 'degrau_50') ? Number((FC_plano + FR_plano_linear + SE_plano_linear).toFixed(2)) : undefined,
+    parcelaFinalNormal: (modalidade === 'degrau' || modalidade === 'degrau_70' || modalidade === 'degrau_50') ? Number((FC_plano + FR_plano_linear + SE_plano_linear + adicionalFuroDiluido).toFixed(2)) : undefined,
     lanceEmbutidoReais: Number(lanceEmbutidoReais.toFixed(2)),
     recursosPropriosReais: Number(recursosPropriosReais.toFixed(2)),
     lanceTotalReais: Number(lanceTotalReais.toFixed(2)),

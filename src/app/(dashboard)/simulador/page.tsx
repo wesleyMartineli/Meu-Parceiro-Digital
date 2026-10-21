@@ -66,13 +66,15 @@ export default async function SimuladorPage() {
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
-      <SimuladorClient
-        leads={leads || []}
-        administradoras={administradoras || []}
-        empresa={empresa || null}
-        usuario={user}
-        campanhas={campanhas || []}
-      />
+      <React.Suspense fallback={<div className="p-8 text-center text-sm font-semibold text-[#00441F]">Carregando simulador...</div>}>
+        <SimuladorClient
+          leads={leads || []}
+          administradoras={administradoras || []}
+          empresa={empresa || null}
+          usuario={user}
+          campanhas={campanhas || []}
+        />
+      </React.Suspense>
     </div>
   );
 }

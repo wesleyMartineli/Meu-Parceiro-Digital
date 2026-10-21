@@ -8,7 +8,7 @@ export interface LeadCandidate {
   nome: string;
 }
 
-export type FollowupTipo = 'ligacao' | 'whatsapp' | 'reuniao' | 'visita' | 'email' | 'outros';
+export type FollowupTipo = 'ligacao' | 'whatsapp' | 'reuniao' | 'visita' | 'reuniao_online' | 'reuniao_presencial' | 'email' | 'outros';
 
 export interface ParsedTaskResult {
   rawPrompt: string;
@@ -26,8 +26,10 @@ export interface ParsedTaskResult {
 const TIPO_LABELS: Record<FollowupTipo, string> = {
   ligacao: 'Ligação',
   whatsapp: 'WhatsApp',
-  reuniao: 'Reunião',
-  visita: 'Visita Presencial',
+  reuniao_online: 'Reunião Online',
+  reuniao_presencial: 'Reunião Presencial',
+  reuniao: 'Reunião Online',
+  visita: 'Reunião Presencial',
   email: 'E-mail',
   outros: 'Outros',
 };
@@ -48,11 +50,11 @@ function extractTipo(promptNorm: string): FollowupTipo {
   if (/\b(whats|whatsapp|zap|mensagem|msg|enviar msg)\b/.test(promptNorm)) {
     return 'whatsapp';
   }
-  if (/\b(visita|visitar|presencial|ir ate|visita comercial)\b/.test(promptNorm)) {
-    return 'visita';
+  if (/\b(reuniao presencial|visita presencial|visita|visitar|presencial|ir ate|visita comercial)\b/.test(promptNorm)) {
+    return 'reuniao_presencial';
   }
-  if (/\b(reuniao|meet|call|alinhamento|videochamada|zoom|apresentacao)\b/.test(promptNorm)) {
-    return 'reuniao';
+  if (/\b(reuniao online|online|meet|call|alinhamento|videochamada|zoom|apresentacao|reuniao)\b/.test(promptNorm)) {
+    return 'reuniao_online';
   }
   if (/\b(email|e-mail|correio)\b/.test(promptNorm)) {
     return 'email';
@@ -254,7 +256,7 @@ function extractTitleAndDesc(rawPrompt: string, matchedLead: LeadCandidate | nul
   // Remove menção ao lead no início para encontrar o objetivo real
   if (matchedLead) {
     const leadFirst = matchedLead.nome.split(' ')[0];
-    cleanText = cleanText.replace(new RegExp(`^(?:ligar|mandar\\s+whatsapp|whatsapp|reuniao|visita|visitar|enviar\\s+email|email)?\\s*(?:para|com|no\\s+parceiro)?\\s*(${matchedLead.nome}|${leadFirst})\\b`, 'i'), '').trim();
+    cleanText = cleanText.replace(new RegExp(`^(?:ligar|mandar\\s+whatsapp|whatsapp|reuniao\\s+online|reuniao\\s+presencial|reuniao|visita|visitar|enviar\\s+email|email)?\\s*(?:para|com|no\\s+parceiro)?\\s*(${matchedLead.nome}|${leadFirst})\\b`, 'i'), '').trim();
   }
 
   // Procura por objetivo: "para ...", "sobre ...", "cobrando ...", "apresentar ..."

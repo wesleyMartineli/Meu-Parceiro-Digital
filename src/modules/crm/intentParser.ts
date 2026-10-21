@@ -170,7 +170,7 @@ export function parseCommercialIntent(userInput: string): ParsedCommercialIntent
   // Determinar a maior pontuação
   const scores = [
     { intent: 'TOP_PRODUCERS' as CommercialIntentType, score: topProdutoresScore, filter: (r: CommercialRecommendation) => r.frenteComercial === 'F_TOP_PRODUTORES' || r.score >= 95 },
-    { intent: 'SUGGEST_MEETINGS' as CommercialIntentType, score: presencialScore, filter: (r: CommercialRecommendation) => r.tipo === 'visita' || r.tipo === 'reuniao' },
+    { intent: 'SUGGEST_MEETINGS' as CommercialIntentType, score: presencialScore, filter: (r: CommercialRecommendation) => r.tipo === 'visita' || r.tipo === 'reuniao' || r.tipo === 'reuniao_online' || r.tipo === 'reuniao_presencial' },
     { intent: 'PRIORITIZE_PRODUCTION' as CommercialIntentType, score: producaoScore, filter: (r: CommercialRecommendation) => r.prioridade === 'alta' || r.referenciaTipo === 'proposta' || r.score >= 80 },
     { intent: 'PROPOSALS_PENDING' as CommercialIntentType, score: propostaScore, filter: (r: CommercialRecommendation) => r.frenteComercial === 'A_PROPOSTAS' || r.referenciaTipo === 'proposta' },
     { intent: 'PARTNERS_TODAY' as CommercialIntentType, score: parceiroScore, filter: (r: CommercialRecommendation) => r.frenteComercial === 'B_CARTEIRA' || r.frenteComercial === 'E_POS_REUNIAO' },
@@ -324,7 +324,7 @@ export function buildAssistantResponse(
         };
       }
 
-      const meetings = recommendations.filter(r => r.tipo === 'visita' || r.tipo === 'reuniao');
+      const meetings = recommendations.filter(r => r.tipo === 'visita' || r.tipo === 'reuniao' || r.tipo === 'reuniao_online' || r.tipo === 'reuniao_presencial');
       if (meetings.length > 0) {
         return {
           messageText: `Preparei as seguintes **sugestões de agenda presencial e reuniões estratégicas**, respeitando a regra de no máximo 1 visita por dia para não sobrecarregar seu deslocamento:`,

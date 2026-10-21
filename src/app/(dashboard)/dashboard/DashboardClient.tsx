@@ -32,7 +32,7 @@ export default function DashboardClient({ user, negocios, tarefas }: DashboardCl
       qtdTotal++;
       if (n.etapa_funil === 'perdido') {
         valorPerdido += credito;
-      } else if (n.etapa_funil === 'fechado') {
+      } else if (n.etapa_funil === 'fechado' || n.etapa_funil === 'fechado_ganho' || n.etapa_funil === 'ganho') {
         valorFechado += credito;
         qtdFechado++;
       } else {
@@ -220,7 +220,16 @@ export default function DashboardClient({ user, negocios, tarefas }: DashboardCl
                   <div key={t.id} className="flex flex-col p-3 rounded-xl border border-gray-100 bg-gray-50/50 hover:bg-[#e9ebe4] hover:border-[#00CF7B]/30 transition-all group">
                     <div className="flex justify-between items-start mb-1">
                       <span className="text-xs font-bold text-gray-800">{t.titulo}</span>
-                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">{t.tipo || 'Outros'}</span>
+                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
+                        {t.tipo === 'reuniao_online' ? 'Reunião Online' :
+                         t.tipo === 'reuniao_presencial' ? 'Reunião Presencial' :
+                         t.tipo === 'visita' ? 'Reunião Presencial' :
+                         t.tipo === 'reuniao' ? 'Reunião Online' :
+                         t.tipo === 'ligacao' ? 'Ligação' :
+                         t.tipo === 'whatsapp' ? 'WhatsApp' :
+                         t.tipo === 'email' ? 'E-mail' :
+                         t.tipo || 'Outros'}
+                      </span>
                     </div>
                     <div className="flex justify-between items-center mt-2">
                       <span className="text-[10px] text-[#00441F] font-semibold font-medium">Cliente: <span className="font-bold">{t.leads?.nome || 'Não definido'}</span></span>
@@ -253,7 +262,7 @@ export default function DashboardClient({ user, negocios, tarefas }: DashboardCl
               <div className="space-y-3">
                 {ultimosNegocios.map(n => {
                   let badgeCor = "bg-blue-100 text-blue-700";
-                  if (n.etapa_funil === 'fechado') badgeCor = "bg-emerald-100 text-emerald-700";
+                  if (n.etapa_funil === 'fechado' || n.etapa_funil === 'fechado_ganho' || n.etapa_funil === 'ganho') badgeCor = "bg-emerald-100 text-emerald-700";
                   if (n.etapa_funil === 'perdido') badgeCor = "bg-rose-100 text-rose-700";
 
                   return (

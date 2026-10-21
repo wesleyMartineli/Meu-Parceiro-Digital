@@ -63,9 +63,12 @@ export default function RelatoriosDashboard({ nomeEmpresa, usuarios, negocios, l
     const filteredNegocios = negociosDoPeriodoTemp.filter(n => n.vendedor_id && selectedGerentes.includes(n.vendedor_id));
     const filteredTarefas = tarefasDoPeriodoTemp.filter(t => t.vendedor_id && selectedGerentes.includes(t.vendedor_id));
 
-    const ganhos = filteredNegocios.filter(n => n.etapa_funil === 'Ganho');
-    const perdidos = filteredNegocios.filter(n => n.etapa_funil === 'Perdido');
-    const emAberto = filteredNegocios.filter(n => n.etapa_funil !== 'Ganho' && n.etapa_funil !== 'Perdido');
+    const isGanho = (s?: string | null) => { const l = s?.toLowerCase(); return l === 'ganho' || l === 'fechado' || l === 'fechado_ganho'; };
+    const isPerdido = (s?: string | null) => s?.toLowerCase() === 'perdido';
+
+    const ganhos = filteredNegocios.filter(n => isGanho(n.etapa_funil));
+    const perdidos = filteredNegocios.filter(n => isPerdido(n.etapa_funil));
+    const emAberto = filteredNegocios.filter(n => !isGanho(n.etapa_funil) && !isPerdido(n.etapa_funil));
 
     const totalVendas = ganhos.reduce((acc, n) => acc + (n.credito || 0), 0);
     const totalPerdidos = perdidos.reduce((acc, n) => acc + (n.credito || 0), 0);
@@ -221,7 +224,10 @@ export default function RelatoriosDashboard({ nomeEmpresa, usuarios, negocios, l
         const leadsDoGerente = leadsDoPeriodo.filter(l => l.vendedor_id === gerenteId);
         const negociosDoGerente = negociosDoPeriodo.filter(n => n.vendedor_id === gerenteId);
         const tarefasDoGerente = tarefasDoPeriodo.filter(t => t.vendedor_id === gerenteId);
-        const ganhos = negociosDoGerente.filter(n => n.etapa_funil === 'Ganho');
+        const ganhos = negociosDoGerente.filter(n => {
+          const l = n.etapa_funil?.toLowerCase();
+          return l === 'ganho' || l === 'fechado' || l === 'fechado_ganho';
+        });
         
         const vendas = ganhos.reduce((acc, n) => acc + (n.credito || 0), 0);
         const conversao = negociosDoGerente.length > 0 ? Math.round((ganhos.length / negociosDoGerente.length) * 100) : 0;
@@ -347,7 +353,11 @@ export default function RelatoriosDashboard({ nomeEmpresa, usuarios, negocios, l
       pdf.text('5. Top 5 Maiores Vendas (Big Wins)', 14, startYBigWins);
 
       // Calcular Big Wins baseado nos filtros
-      const allGanhos = negociosDoPeriodo.filter(n => n.etapa_funil === 'Ganho' && n.vendedor_id && selectedGerentes.includes(n.vendedor_id));
+      const allGanhos = negociosDoPeriodo.filter(n => {
+        const l = n.etapa_funil?.toLowerCase();
+        const isG = l === 'ganho' || l === 'fechado' || l === 'fechado_ganho';
+        return isG && n.vendedor_id && selectedGerentes.includes(n.vendedor_id);
+      });
       const top5Ganhos = allGanhos.sort((a, b) => (b.credito || 0) - (a.credito || 0)).slice(0, 5);
 
       const bigWinsTableBody = top5Ganhos.map((ganho, index) => {

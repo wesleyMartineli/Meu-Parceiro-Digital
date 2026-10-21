@@ -458,15 +458,22 @@ export default function TarefasClient({ tarefas, leads }: TarefasClientProps) {
                               {visual.badge}
                             </span>
                           )}
-                          <span className={`px-2 py-0.5 rounded text-[9px] font-bold tracking-wider capitalize ${
+                          <span className={`px-2 py-0.5 rounded text-[9px] font-bold tracking-wider ${
                             t.tipo === 'whatsapp' ? 'bg-green-100 text-green-700' :
                             t.tipo === 'ligacao' ? 'bg-blue-100 text-blue-700' :
                             t.tipo === 'email' ? 'bg-purple-100 text-purple-700' :
-                            t.tipo === 'visita' ? 'bg-orange-100 text-orange-700' :
-                            t.tipo === 'reuniao' ? 'bg-teal-100 text-teal-700' :
+                            (t.tipo === 'visita' || t.tipo === 'reuniao_presencial') ? 'bg-orange-100 text-orange-700' :
+                            (t.tipo === 'reuniao' || t.tipo === 'reuniao_online') ? 'bg-teal-100 text-teal-700' :
                             'bg-gray-100 text-gray-700'
                           }`}>
-                            {t.tipo || 'Outros'}
+                            {t.tipo === 'reuniao_online' ? 'Reunião Online' :
+                             t.tipo === 'reuniao_presencial' ? 'Reunião Presencial' :
+                             t.tipo === 'visita' ? 'Reunião Presencial' :
+                             t.tipo === 'reuniao' ? 'Reunião Online' :
+                             t.tipo === 'ligacao' ? 'Ligação' :
+                             t.tipo === 'whatsapp' ? 'WhatsApp' :
+                             t.tipo === 'email' ? 'E-mail' :
+                             t.tipo || 'Outros'}
                           </span>
                           {isConcluido && (
                             <span className="px-2 py-0.5 rounded text-[9px] font-bold tracking-wider bg-gray-200 text-gray-700">
