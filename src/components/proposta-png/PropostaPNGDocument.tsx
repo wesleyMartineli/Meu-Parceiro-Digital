@@ -107,8 +107,21 @@ export const PropostaPNGDocument = React.forwardRef<HTMLDivElement, PropostaPDFD
             </div>
             <div>
               <p className="text-[10px] font-semibold text-gray-400 uppercase mb-1">Pós-Contemplação</p>
-              <p className="text-xl font-black" style={{ color: cPrimaria }}>{formatCurrency(data.parcelaPosContemplacao)}</p>
-              <p className="text-[9px] text-gray-400 mt-1">{data.prazoPosContemplacao} meses restantes</p>
+              {data.parcelaPosContemplacaoInicial ? (
+                <>
+                  <p className="text-xs font-bold text-gray-800">
+                    Até {Math.ceil((data.prazo || 0) / 2)}x: <span style={{ color: cPrimaria }}>{formatCurrency(data.parcelaPosContemplacaoInicial)}</span>
+                  </p>
+                  <p className="text-xs font-bold text-gray-800 mt-0.5">
+                    {Math.ceil((data.prazo || 0) / 2) + 1} a {data.prazo}x: <span style={{ color: cPrimaria }}>{formatCurrency(data.parcelaPosContemplacao || data.parcelaFinal)}</span>
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-xl font-black" style={{ color: cPrimaria }}>{formatCurrency(data.parcelaPosContemplacao || data.parcelaFinal)}</p>
+                  <p className="text-[9px] text-gray-400 mt-1">{data.prazoPosContemplacao || data.prazo} meses restantes</p>
+                </>
+              )}
             </div>
           </div>
         </div>

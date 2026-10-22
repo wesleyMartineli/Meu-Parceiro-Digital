@@ -23,6 +23,9 @@ export interface PropostaData {
   creditoLiquido?: number;
   parcelaInicial?: number;
   parcelaPosContemplacao?: number;
+  parcelaPosContemplacaoInicial?: number;
+  parcelaFinal?: number;
+  modalidade?: string;
   parcelaPosAdesao?: number;
   prazoTaxaAdesao?: number;
   mesContemplacao?: number;

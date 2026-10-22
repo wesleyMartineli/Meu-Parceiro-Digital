@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useTransition, useMemo } from 'react';
+import React, { useState, useTransition, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import { 
   Users, 
@@ -21,14 +21,33 @@ import {
   Trash2,
   Plus,
   Sparkles,
-  Calculator
+  Calculator,
+  GitMerge,
+  Info
 } from 'lucide-react';
-import { updateNegocioStageAction, deleteNegocioAction, createNegocioManualAction } from '@/modules/crm/actions';
+import { 
+  updateNegocioStageAction, 
+  deleteNegocioAction, 
+  createNegocioManualAction,
+  unificarNegociosAction,
+  fecharNegocioUnificadoAction
+} from '@/modules/crm/actions';
 
 interface GerenteNegocio {
   id: string;
   nome: string;
   role?: string;
+}
+
+export interface PropostaUnificadaItem {
+  negocio_id: string;
+  proposta_id?: string | null;
+  titulo: string;
+  credito: number;
+  modalidade: string;
+  administradora?: string | null;
+  etapa_funil: string;
+  created_at: string;
 }
 
 interface Negocio {
@@ -45,6 +64,11 @@ interface Negocio {
   ultima_interacao: string | null;
   motivo_perda: string | null;
   vendedor_id: string | null;
+  is_unificado?: boolean | null;
+  propostas_unificadas?: PropostaUnificadaItem[] | null;
+  valor_medio?: number | null;
+  valor_fechamento?: number | null;
+  proposta_fechada_id?: string | null;
   created_at: string;
   updated_at: string;
   leads?: {
@@ -149,6 +173,27 @@ export default function MeusNegociosClient({
   const [oportunidadeTitulo, setOportunidadeTitulo] = useState('');
   const [isSubmittingOportunidade, setIsSubmittingOportunidade] = useState(false);
   const [oportunidadeFeedback, setOportunidadeFeedback] = useState<string | null>(null);
+
+  // Modal Unificar Propostas
+  const [isUnificarOpen, setIsUnificarOpen] = useState(false);
+  const [unificarClienteId, setUnificarClienteId] = useState('');
+  const [selectedNegocioIds, setSelectedNegocioIds] = useState<string[]>([]);
+  const [valorUnificadoCustomizado, setValorUnificadoCustomizado] = useState<number | null>(null);
+  const [usarMedia, setUsarMedia] = useState(true);
+  const [tituloUnificadoCustomizado, setTituloUnificadoCustomizado] = useState('');
+  const [isSubmittingUnificar, setIsSubmittingUnificar] = useState(false);
+  const [unificarFeedback, setUnificarFeedback] = useState<string | null>(null);
+
+  // Modal Fechar Negócio Unificado
+  const [isFecharUnificadoOpen, setIsFecharUnificadoOpen] = useState(false);
+  const [negocioParaFechar, setNegocioParaFechar] = useState<Negocio | null>(null);
+  const [fecharValorEscolhido, setFecharValorEscolhido] = useState<number>(0);
+  const [fecharPropostaIdEscolhida, setFecharPropostaIdEscolhida] = useState<string | null>(null);
+  const [isSubmittingFechar, setIsSubmittingFechar] = useState(false);
+  const [fecharFeedback, setFecharFeedback] = useState<string | null>(null);
+
+  // Modal Visualizar Cenários Unificados
+  const [cenariosModalNegocio, setCenariosModalNegocio] = useState<Negocio | null>(null);
 
   const isLeader =
     currentUser.role === 'regional' ||
@@ -288,6 +333,122 @@ export default function MeusNegociosClient({
       window.location.reload();
     } else {
       setOportunidadeFeedback(res.message || 'Erro ao criar oportunidade.');
+    }
+  };
+
+  // Propostas disponíveis para o cliente selecionado no modal de unificação
+  const propostasDoClienteUnificar = useMemo(() => {
+    if (!unificarClienteId) return [];
+    return negocios.filter(
+      (n) => n.cliente_id === unificarClienteId && normalizeEtapa(n.etapa_funil) !== 'fechado_ganho' && normalizeEtapa(n.etapa_funil) !== 'perdido'
+    );
+  }, [negocios, unificarClienteId]);
+
+  // Ao trocar o cliente no modal, pré-seleciona todos os negócios em aberto desse cliente
+  useEffect(() => {
+    if (unificarClienteId) {
+      const items = negocios.filter(
+        (n) => n.cliente_id === unificarClienteId && normalizeEtapa(n.etapa_funil) !== 'fechado_ganho' && normalizeEtapa(n.etapa_funil) !== 'perdido'
+      );
+      setSelectedNegocioIds(items.map((i) => i.id));
+      setUsarMedia(true);
+      setValorUnificadoCustomizado(null);
+      setTituloUnificadoCustomizado('');
+    } else {
+      setSelectedNegocioIds([]);
+    }
+  }, [unificarClienteId, negocios]);
+
+  const propostasSelecionadasUnificar = useMemo(() => {
+    return propostasDoClienteUnificar.filter((n) => selectedNegocioIds.includes(n.id));
+  }, [propostasDoClienteUnificar, selectedNegocioIds]);
+
+  const valoresSelecionados = useMemo(() => {
+    return propostasSelecionadasUnificar.map((n) => Number(n.credito || 0));
+  }, [propostasSelecionadasUnificar]);
+
+  const somaValoresSelecionados = useMemo(() => {
+    return valoresSelecionados.reduce((acc, v) => acc + v, 0);
+  }, [valoresSelecionados]);
+
+  const mediaValoresSelecionados = useMemo(() => {
+    if (valoresSelecionados.length === 0) return 0;
+    return Math.round(somaValoresSelecionados / valoresSelecionados.length);
+  }, [valoresSelecionados, somaValoresSelecionados]);
+
+  const isDivergente = useMemo(() => {
+    return new Set(valoresSelecionados).size > 1;
+  }, [valoresSelecionados]);
+
+  const handleUnificar = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!unificarClienteId) {
+      setUnificarFeedback('Por favor, selecione um parceiro/cliente.');
+      return;
+    }
+    if (selectedNegocioIds.length < 2) {
+      setUnificarFeedback('Selecione pelo menos 2 propostas para unificar.');
+      return;
+    }
+
+    const valorFinal = usarMedia ? mediaValoresSelecionados : (valorUnificadoCustomizado || mediaValoresSelecionados);
+
+    setIsSubmittingUnificar(true);
+    setUnificarFeedback(null);
+
+    try {
+      const res = await unificarNegociosAction({
+        clienteId: unificarClienteId,
+        negocioIds: selectedNegocioIds,
+        valorDefinido: valorFinal,
+        tituloPersonalizado: tituloUnificadoCustomizado.trim() || undefined,
+      });
+
+      if (res.success) {
+        setIsUnificarOpen(false);
+        setUnificarClienteId('');
+        setSelectedNegocioIds([]);
+        window.location.reload();
+      } else {
+        setUnificarFeedback(res.message || 'Erro ao unificar propostas.');
+      }
+    } catch (err: any) {
+      setUnificarFeedback(`Erro: ${err?.message || 'Falha ao processar unificação'}`);
+    } finally {
+      setIsSubmittingUnificar(false);
+    }
+  };
+
+  const handleConfirmarFechamentoUnificado = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!negocioParaFechar) return;
+
+    if (!fecharValorEscolhido || fecharValorEscolhido <= 0) {
+      setFecharFeedback('Por favor, informe um valor de fechamento válido.');
+      return;
+    }
+
+    setIsSubmittingFechar(true);
+    setFecharFeedback(null);
+
+    try {
+      const res = await fecharNegocioUnificadoAction({
+        negocioId: negocioParaFechar.id,
+        valorFinal: fecharValorEscolhido,
+        propostaFechadaId: fecharPropostaIdEscolhida || null,
+      });
+
+      if (res.success) {
+        setIsFecharUnificadoOpen(false);
+        setNegocioParaFechar(null);
+        window.location.reload();
+      } else {
+        setFecharFeedback(res.message || 'Erro ao fechar negócio.');
+      }
+    } catch (err: any) {
+      setFecharFeedback(`Erro: ${err?.message || 'Falha ao registrar fechamento'}`);
+    } finally {
+      setIsSubmittingFechar(false);
     }
   };
 
@@ -572,6 +733,15 @@ export default function MeusNegociosClient({
 
     if (nextIndex >= 0 && nextIndex < ETAPAS.length) {
       const newStage = ETAPAS[nextIndex].id;
+      if (newStage === 'fechado_ganho' && negocio.is_unificado) {
+        setNegocioParaFechar(negocio);
+        setFecharValorEscolhido(Number(negocio.credito || 0));
+        setFecharPropostaIdEscolhida(negocio.proposta_fechada_id || negocio.proposta_id || null);
+        setFecharFeedback(null);
+        setIsFecharUnificadoOpen(true);
+        return;
+      }
+
       startTransition(async () => {
         const res = await updateNegocioStageAction(negocio.id, newStage, negocio.proposta_id);
         if (!res.success) {
@@ -582,6 +752,15 @@ export default function MeusNegociosClient({
   };
 
   const handleDropdownMove = async (negocio: Negocio, newStage: string) => {
+    if (newStage === 'fechado_ganho' && negocio.is_unificado) {
+      setNegocioParaFechar(negocio);
+      setFecharValorEscolhido(Number(negocio.credito || 0));
+      setFecharPropostaIdEscolhida(negocio.proposta_fechada_id || negocio.proposta_id || null);
+      setFecharFeedback(null);
+      setIsFecharUnificadoOpen(true);
+      return;
+    }
+
     startTransition(async () => {
       const res = await updateNegocioStageAction(negocio.id, newStage, negocio.proposta_id);
       if (!res.success) {
@@ -662,6 +841,19 @@ export default function MeusNegociosClient({
           >
             <Plus className="h-4 w-4 text-[#00CF7B]" />
             Nova Oportunidade
+          </button>
+
+          {/* Botão Unificar Propostas */}
+          <button
+            onClick={() => {
+              setIsUnificarOpen(true);
+              setUnificarFeedback(null);
+            }}
+            className="inline-flex items-center justify-center gap-2 rounded-xl border-2 border-[#00441F]/20 bg-white px-4 py-2 text-sm font-bold text-[#00441F] shadow-xs hover:bg-emerald-50 hover:border-[#00CF7B] transition-all cursor-pointer"
+            title="Unificar propostas e opções de um mesmo parceiro/cliente em uma negociação consolidada"
+          >
+            <GitMerge className="h-4 w-4 text-[#00CF7B]" />
+            Unificar Propostas
           </button>
 
           <Link
@@ -1000,8 +1192,21 @@ export default function MeusNegociosClient({
                     <tr key={negocio.id} className="hover:bg-white/40 transition-colors">
                       {/* Título do Negócio */}
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="font-extrabold text-[#00441F] line-clamp-1">
-                          {negocio.titulo}
+                        <div className="flex items-center gap-2">
+                          <span className="font-extrabold text-[#00441F] line-clamp-1">
+                            {negocio.titulo}
+                          </span>
+                          {negocio.is_unificado && (
+                            <button
+                              type="button"
+                              onClick={() => setCenariosModalNegocio(negocio)}
+                              className="inline-flex items-center gap-1 text-[10px] bg-indigo-50 text-indigo-700 border border-indigo-200 font-black px-2 py-0.5 rounded-md hover:bg-indigo-100 transition-colors cursor-pointer shrink-0"
+                              title="Clique para ver os cenários unificados"
+                            >
+                              <GitMerge className="w-3 h-3 text-indigo-600" />
+                              <span>{negocio.propostas_unificadas?.length || 2} Cenários</span>
+                            </button>
+                          )}
                         </div>
                         <div className="text-[11px] text-[#00441F]/70 mt-0.5">
                           Origem: {negocio.origem || 'Direto'}
@@ -1038,8 +1243,20 @@ export default function MeusNegociosClient({
 
                       {/* Crédito & Modalidade */}
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="font-black text-[#00441F] text-base">
-                          {formatCurrency(negocio.credito)}
+                        <div className="flex items-baseline gap-1.5 flex-wrap">
+                          <span className="font-black text-[#00441F] text-base">
+                            {formatCurrency(negocio.credito)}
+                          </span>
+                          {negocio.is_unificado && negocio.valor_medio && !negocio.valor_fechamento && (
+                            <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200" title="Valor calculado pela média">
+                              (Média)
+                            </span>
+                          )}
+                          {negocio.is_unificado && negocio.valor_fechamento && (
+                            <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200" title="Valor confirmado de fechamento">
+                              (Fechado: {formatCurrency(negocio.valor_fechamento)})
+                            </span>
+                          )}
                         </div>
                         <div className="text-[11px] text-[#00441F]/80 font-bold uppercase tracking-wider mt-0.5">
                           {negocio.modalidade}{' '}
@@ -1159,10 +1376,23 @@ export default function MeusNegociosClient({
                         className="bg-white border border-[#E0E5CF] rounded-xl p-4 shadow-xs hover:shadow-md hover:border-[#00CF7B] transition-all space-y-2.5"
                       >
                         {/* Badges de Topo: Modalidade & Administradora */}
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-[10px] bg-[#e9ebe4] text-[#00441F] font-extrabold px-2 py-0.5 rounded-md uppercase tracking-wider">
-                            {neg.modalidade}
-                          </span>
+                        <div className="flex items-center justify-between gap-1.5 flex-wrap">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-[10px] bg-[#e9ebe4] text-[#00441F] font-extrabold px-2 py-0.5 rounded-md uppercase tracking-wider">
+                              {neg.modalidade}
+                            </span>
+                            {neg.is_unificado && (
+                              <button
+                                type="button"
+                                onClick={() => setCenariosModalNegocio(neg)}
+                                className="inline-flex items-center gap-1 text-[10px] bg-indigo-50 text-indigo-700 border border-indigo-200 font-black px-2 py-0.5 rounded-md hover:bg-indigo-100 transition-colors cursor-pointer"
+                                title="Ver todos os cenários/propostas unificadas"
+                              >
+                                <GitMerge className="w-3 h-3 text-indigo-600" />
+                                <span>{neg.propostas_unificadas?.length || 2} Opções</span>
+                              </button>
+                            )}
+                          </div>
                           {neg.administradora && (
                             <span className="text-[10px] text-[#00441F]/70 font-semibold truncate">
                               🏢 {neg.administradora}
@@ -1204,8 +1434,20 @@ export default function MeusNegociosClient({
                               <div className="text-xs font-medium text-gray-700 line-clamp-1">
                                 {negocioFormatTitle(neg.titulo)}
                               </div>
-                              <div className="text-base font-black text-[#00441F] mt-0.5">
-                                {formatCurrency(neg.credito)}
+                              <div className="flex items-baseline gap-1.5 mt-0.5 flex-wrap">
+                                <span className="text-base font-black text-[#00441F]">
+                                  {formatCurrency(neg.credito)}
+                                </span>
+                                {neg.is_unificado && neg.valor_medio && !neg.valor_fechamento && (
+                                  <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200" title="Valor calculado pela média">
+                                    Média
+                                  </span>
+                                )}
+                                {neg.is_unificado && neg.valor_fechamento && (
+                                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200" title="Valor confirmado de fechamento">
+                                    Fechado
+                                  </span>
+                                )}
                               </div>
                             </>
                           )}
@@ -1228,6 +1470,24 @@ export default function MeusNegociosClient({
                             <Calculator className="w-3.5 h-3.5" />
                             <span>Criar Simulação</span>
                           </Link>
+                        )}
+
+                        {/* Botão de Fechamento de Negócio Unificado */}
+                        {neg.is_unificado && normalizeEtapa(neg.etapa_funil) !== 'fechado_ganho' && normalizeEtapa(neg.etapa_funil) !== 'perdido' && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setNegocioParaFechar(neg);
+                              setFecharValorEscolhido(Number(neg.credito || 0));
+                              setFecharPropostaIdEscolhida(neg.proposta_fechada_id || neg.proposta_id || null);
+                              setFecharFeedback(null);
+                              setIsFecharUnificadoOpen(true);
+                            }}
+                            className="w-full flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-[11px] font-extrabold shadow-xs transition-all text-center cursor-pointer"
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5 text-white" />
+                            <span>Definir Fechamento / Valor Final</span>
+                          </button>
                         )}
 
                         {/* Rodapé do Card: Links e Excluir */}
@@ -1477,6 +1737,655 @@ export default function MeusNegociosClient({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL 1: UNIFICAR PROPOSTAS DO PARCEIRO/CLIENTE                           */}
+      {/* ========================================================================= */}
+      {isUnificarOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-[#e9ebe4] border border-[#E0E5CF] rounded-3xl max-w-2xl w-full p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+            {/* Header do Modal */}
+            <div className="flex items-center justify-between pb-4 border-b border-[#E0E5CF]">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center">
+                  <GitMerge className="w-5 h-5 text-indigo-700" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-black text-[#00441F]">Unificar Propostas de Negociação</h2>
+                  <p className="text-xs text-[#00441F]/70 font-medium">
+                    Consolide múltiplos cenários e valores de um mesmo parceiro em um único card no CRM
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsUnificarOpen(false);
+                  setUnificarFeedback(null);
+                }}
+                className="p-1.5 rounded-xl hover:bg-black/5 text-[#00441F]/70 hover:text-[#00441F] transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {unificarFeedback && (
+              <div className="mt-4 p-3 rounded-xl bg-red-100 border border-red-200 text-red-800 text-xs font-bold">
+                {unificarFeedback}
+              </div>
+            )}
+
+            <form onSubmit={handleUnificar} className="mt-5 space-y-5">
+              {/* Passo 1: Selecionar Parceiro / Ponto de Venda */}
+              <div>
+                <label className="block text-xs font-extrabold text-[#00441F] uppercase tracking-wider mb-1.5">
+                  1. Ponto de Venda / Parceiro <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={unificarClienteId}
+                  onChange={(e) => setUnificarClienteId(e.target.value)}
+                  required
+                  className="w-full bg-white border border-[#E0E5CF] rounded-xl px-3.5 py-2.5 text-xs font-bold text-[#00441F] outline-none focus:ring-2 focus:ring-[#00CF7B]"
+                >
+                  <option value="">-- Selecione o parceiro para buscar propostas --</option>
+                  {listaClientes.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.nome} {'telefone' in c && (c as any).telefone ? `(${(c as any).telefone})` : ''}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-[#00441F]/70 mt-1">
+                  O sistema listará automaticamente todas as propostas e oportunidades ativas deste parceiro.
+                </p>
+              </div>
+
+              {/* Passo 2: Listar e Selecionar Propostas */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs font-extrabold text-[#00441F] uppercase tracking-wider">
+                    2. Selecione as Propostas para Unificar ({selectedNegocioIds.length} selecionadas) <span className="text-red-500">*</span>
+                  </label>
+                  {propostasDoClienteUnificar.length > 0 && (
+                    <div className="flex gap-2 text-[11px]">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedNegocioIds(propostasDoClienteUnificar.map((p) => p.id))}
+                        className="font-bold text-indigo-700 hover:underline cursor-pointer"
+                      >
+                        Selecionar todas
+                      </button>
+                      <span className="text-gray-400">•</span>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedNegocioIds([])}
+                        className="font-bold text-gray-600 hover:underline cursor-pointer"
+                      >
+                        Limpar
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {!unificarClienteId ? (
+                  <div className="p-4 rounded-xl bg-white border border-[#E0E5CF] text-center text-xs text-gray-500">
+                    Selecione um parceiro no campo acima para carregar as propostas.
+                  </div>
+                ) : propostasDoClienteUnificar.length === 0 ? (
+                  <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-center text-xs font-bold text-amber-800">
+                    Nenhuma proposta ativa em aberto encontrada para este parceiro.
+                  </div>
+                ) : (
+                  <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                    {propostasDoClienteUnificar.map((p) => {
+                      const isSelected = selectedNegocioIds.includes(p.id);
+                      return (
+                        <div
+                          key={p.id}
+                          onClick={() => {
+                            if (isSelected) {
+                              setSelectedNegocioIds(selectedNegocioIds.filter((id) => id !== p.id));
+                            } else {
+                              setSelectedNegocioIds([...selectedNegocioIds, p.id]);
+                            }
+                          }}
+                          className={`p-3 rounded-xl border flex items-center justify-between gap-3 cursor-pointer transition-all ${
+                            isSelected
+                              ? 'bg-indigo-50/80 border-indigo-400 shadow-xs'
+                              : 'bg-white border-[#E0E5CF] hover:bg-gray-50'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => {}}
+                              className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 pointer-events-none"
+                            />
+                            <div>
+                              <div className="font-bold text-xs text-[#00441F]">{p.titulo}</div>
+                              <div className="text-[11px] text-[#00441F]/70 flex items-center gap-2 mt-0.5">
+                                <span className="uppercase font-semibold">{p.modalidade}</span>
+                                {p.administradora && <span>• {p.administradora}</span>}
+                                <span>• Etapa: {getEtapaLabel(p.etapa_funil)}</span>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <div className="font-black text-sm text-[#00441F]">
+                              {formatCurrency(p.credito)}
+                            </div>
+                            <span className="text-[10px] text-gray-500 font-medium">
+                              {formatDate(p.created_at)}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Passo 3: Regra de Cálculo (Média em caso de divergência) */}
+              {selectedNegocioIds.length >= 2 && (
+                <div className="p-4 rounded-2xl bg-white border border-[#E0E5CF] space-y-3">
+                  <div className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-[#00441F]">
+                    <Calculator className="w-4 h-4 text-[#00CF7B]" />
+                    <span>3. Cálculo do Valor Consolidado no Pipeline</span>
+                  </div>
+
+                  {isDivergente ? (
+                    <div className="space-y-3">
+                      <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs">
+                        <div className="flex items-start gap-2">
+                          <Info className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                          <div>
+                            <span className="font-extrabold">Valores divergentes identificados: </span>
+                            {valoresSelecionados.map((v) => formatCurrency(v)).join(', ')}.
+                            <p className="mt-1 text-[11px] text-amber-800">
+                              Para não inflar o pipeline, o sistema calcula automaticamente o <strong>valor médio</strong> das propostas.
+                              Ao fechar a negociação, você poderá escolher o valor original que foi contratado.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                        <label
+                          className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-all ${
+                            usarMedia
+                              ? 'bg-emerald-50 border-emerald-500 shadow-xs'
+                              : 'bg-white border-gray-200 hover:bg-gray-50'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <input
+                              type="radio"
+                              name="tipoValor"
+                              checked={usarMedia}
+                              onChange={() => {
+                                setUsarMedia(true);
+                                setValorUnificadoCustomizado(null);
+                              }}
+                              className="w-4 h-4 text-emerald-600 focus:ring-emerald-500"
+                            />
+                            <div>
+                              <div className="text-xs font-black text-[#00441F]">Usar Valor Médio (Recomendado)</div>
+                              <div className="text-[10px] text-gray-500">Média aritmética dos cenários</div>
+                            </div>
+                          </div>
+                          <div className="font-black text-sm text-emerald-700">
+                            {formatCurrency(mediaValoresSelecionados)}
+                          </div>
+                        </label>
+
+                        <label
+                          className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-all ${
+                            !usarMedia
+                              ? 'bg-emerald-50 border-emerald-500 shadow-xs'
+                              : 'bg-white border-gray-200 hover:bg-gray-50'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <input
+                              type="radio"
+                              name="tipoValor"
+                              checked={!usarMedia}
+                              onChange={() => {
+                                setUsarMedia(false);
+                                setValorUnificadoCustomizado(mediaValoresSelecionados);
+                              }}
+                              className="w-4 h-4 text-emerald-600 focus:ring-emerald-500"
+                            />
+                            <div>
+                              <div className="text-xs font-black text-[#00441F]">Valor Personalizado</div>
+                              <div className="text-[10px] text-gray-500">Digitar outro valor manual</div>
+                            </div>
+                          </div>
+                        </label>
+                      </div>
+
+                      {!usarMedia && (
+                        <div className="pt-2">
+                          <label className="block text-[11px] font-bold text-[#00441F] mb-1">
+                            Valor Consolidado Desejado (R$):
+                          </label>
+                          <input
+                            type="number"
+                            min="1000"
+                            step="1000"
+                            value={valorUnificadoCustomizado || ''}
+                            onChange={(e) => setValorUnificadoCustomizado(Number(e.target.value))}
+                            placeholder="0,00"
+                            required
+                            className="w-full bg-white border border-[#E0E5CF] rounded-xl px-3.5 py-2 text-xs font-black text-[#00441F] outline-none focus:ring-2 focus:ring-[#00CF7B]"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-900 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                        <div>
+                          <span className="font-bold">Todas as propostas possuem o mesmo valor:</span>
+                          <div className="text-[11px] text-emerald-800">
+                            Cenários diferentes (ex: linear vs degrau) para o mesmo crédito.
+                          </div>
+                        </div>
+                      </div>
+                      <span className="font-black text-sm text-emerald-800">
+                        {formatCurrency(valoresSelecionados[0] || 0)}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Passo 4: Título Personalizado */}
+              {selectedNegocioIds.length >= 2 && (
+                <div>
+                  <label className="block text-xs font-extrabold text-[#00441F] uppercase tracking-wider mb-1">
+                    4. Nome / Título do Negócio Consolidado (Opcional)
+                  </label>
+                  <input
+                    type="text"
+                    value={tituloUnificadoCustomizado}
+                    onChange={(e) => setTituloUnificadoCustomizado(e.target.value)}
+                    placeholder={`Ex: Propostas Consolidadas (${selectedNegocioIds.length} Cenários)`}
+                    className="w-full bg-white border border-[#E0E5CF] rounded-xl px-3.5 py-2.5 text-xs text-[#00441F] outline-none focus:ring-2 focus:ring-[#00CF7B]"
+                  />
+                </div>
+              )}
+
+              {/* Botões do Rodapé */}
+              <div className="pt-3 border-t border-[#E0E5CF] flex justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsUnificarOpen(false);
+                    setUnificarFeedback(null);
+                  }}
+                  disabled={isSubmittingUnificar}
+                  className="px-4 py-2 rounded-xl border border-[#E0E5CF] text-xs font-bold text-[#00441F] bg-white hover:bg-gray-50 transition-colors cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={selectedNegocioIds.length < 2 || isSubmittingUnificar}
+                  className="px-5 py-2 rounded-xl bg-indigo-600 text-white text-xs font-black shadow-xs hover:bg-indigo-700 transition-all cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  {isSubmittingUnificar ? (
+                    'Unificando...'
+                  ) : (
+                    <>
+                      <GitMerge className="w-4 h-4" />
+                      Unificar {selectedNegocioIds.length} Propostas
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL 2: CONFIRMAR FECHAMENTO DE NEGÓCIO UNIFICADO                        */}
+      {/* ========================================================================= */}
+      {isFecharUnificadoOpen && negocioParaFechar && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-[#e9ebe4] border border-[#E0E5CF] rounded-3xl max-w-lg w-full p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+            {/* Header */}
+            <div className="flex items-center justify-between pb-4 border-b border-[#E0E5CF]">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
+                  <CheckCircle2 className="w-6 h-6 text-emerald-700" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-black text-[#00441F]">Confirmar Fechamento (Ganho)</h2>
+                  <p className="text-xs text-[#00441F]/70 font-medium">
+                    Escolha qual proposta venceu ou defina o valor final fechado
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsFecharUnificadoOpen(false);
+                  setNegocioParaFechar(null);
+                  setFecharFeedback(null);
+                }}
+                className="p-1.5 rounded-xl hover:bg-black/5 text-[#00441F]/70 hover:text-[#00441F] transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {fecharFeedback && (
+              <div className="mt-4 p-3 rounded-xl bg-red-100 border border-red-200 text-red-800 text-xs font-bold">
+                {fecharFeedback}
+              </div>
+            )}
+
+            <form onSubmit={handleConfirmarFechamentoUnificado} className="mt-4 space-y-4">
+              <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-950 text-xs leading-relaxed">
+                Este negócio unificou múltiplos cenários para o cliente{' '}
+                <strong>{negocioParaFechar.leads?.nome || 'Cliente'}</strong>. Selecione qual opção foi fechada de fato:
+              </div>
+
+              {/* Lista dos Cenários Unificados como Opções de Rádio */}
+              <div className="space-y-2">
+                <label className="block text-xs font-extrabold text-[#00441F] uppercase tracking-wider mb-1">
+                  Selecione a Proposta / Valor Vencedor:
+                </label>
+
+                {Array.isArray(negocioParaFechar.propostas_unificadas) &&
+                  negocioParaFechar.propostas_unificadas.map((item, idx) => {
+                    const isSelected =
+                      fecharValorEscolhido === Number(item.credito) &&
+                      fecharPropostaIdEscolhida === (item.proposta_id || null);
+                    return (
+                      <label
+                        key={idx}
+                        className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-all ${
+                          isSelected
+                            ? 'bg-emerald-50 border-emerald-500 shadow-xs'
+                            : 'bg-white border-gray-200 hover:bg-gray-50'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="radio"
+                            name="cenarioVencedor"
+                            checked={isSelected}
+                            onChange={() => {
+                              setFecharValorEscolhido(Number(item.credito));
+                              setFecharPropostaIdEscolhida(item.proposta_id || null);
+                            }}
+                            className="w-4 h-4 text-emerald-600 focus:ring-emerald-500"
+                          />
+                          <div>
+                            <div className="text-xs font-black text-[#00441F]">
+                              {item.titulo || `Cenário ${idx + 1}`}
+                            </div>
+                            <div className="text-[11px] text-[#00441F]/70">
+                              {item.modalidade} {item.administradora ? `• ${item.administradora}` : ''}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="font-black text-sm text-[#00441F]">
+                            {formatCurrency(Number(item.credito))}
+                          </div>
+                          <span className="text-[10px] text-emerald-700 font-semibold">Valor original</span>
+                        </div>
+                      </label>
+                    );
+                  })}
+
+                {/* Opção Manter Valor Médio */}
+                {negocioParaFechar.valor_medio && (
+                  <label
+                    className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-all ${
+                      fecharValorEscolhido === Number(negocioParaFechar.valor_medio) &&
+                      fecharPropostaIdEscolhida === null
+                        ? 'bg-emerald-50 border-emerald-500 shadow-xs'
+                        : 'bg-white border-gray-200 hover:bg-gray-50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="radio"
+                        name="cenarioVencedor"
+                        checked={
+                          fecharValorEscolhido === Number(negocioParaFechar.valor_medio) &&
+                          fecharPropostaIdEscolhida === null
+                        }
+                        onChange={() => {
+                          setFecharValorEscolhido(Number(negocioParaFechar.valor_medio));
+                          setFecharPropostaIdEscolhida(null);
+                        }}
+                        className="w-4 h-4 text-emerald-600 focus:ring-emerald-500"
+                      />
+                      <div>
+                        <div className="text-xs font-black text-[#00441F]">Manter Valor Médio Consolidado</div>
+                        <div className="text-[10px] text-gray-500">Valor já calculado na esteira</div>
+                      </div>
+                    </div>
+                    <div className="font-black text-sm text-amber-700">
+                      {formatCurrency(Number(negocioParaFechar.valor_medio))}
+                    </div>
+                  </label>
+                )}
+              </div>
+
+              {/* Campo de confirmação/ajuste do valor numérico */}
+              <div className="pt-2">
+                <label className="block text-xs font-extrabold text-[#00441F] uppercase tracking-wider mb-1">
+                  Valor Final de Fechamento Confirmado (R$) <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-black text-[#00441F]/60">
+                    R$
+                  </span>
+                  <input
+                    type="number"
+                    min="1"
+                    step="100"
+                    value={fecharValorEscolhido || ''}
+                    onChange={(e) => setFecharValorEscolhido(Number(e.target.value))}
+                    required
+                    className="w-full bg-white border border-[#E0E5CF] rounded-xl pl-10 pr-3.5 py-2.5 text-sm font-black text-[#00441F] outline-none focus:ring-2 focus:ring-[#00CF7B]"
+                  />
+                </div>
+              </div>
+
+              {/* Rodapé */}
+              <div className="pt-3 border-t border-[#E0E5CF] flex justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsFecharUnificadoOpen(false);
+                    setNegocioParaFechar(null);
+                    setFecharFeedback(null);
+                  }}
+                  disabled={isSubmittingFechar}
+                  className="px-4 py-2 rounded-xl border border-[#E0E5CF] text-xs font-bold text-[#00441F] bg-white hover:bg-gray-50 transition-colors cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={!fecharValorEscolhido || fecharValorEscolhido <= 0 || isSubmittingFechar}
+                  className="px-5 py-2 rounded-xl bg-emerald-700 text-white text-xs font-black shadow-xs hover:bg-emerald-800 transition-all cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  {isSubmittingFechar ? (
+                    'Salvando Fechamento...'
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-4 h-4 text-white" />
+                      Confirmar Fechado / Ganho
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL 3: VISUALIZAR CENÁRIOS DA NEGOCIAÇÃO UNIFICADA                      */}
+      {/* ========================================================================= */}
+      {cenariosModalNegocio && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-[#e9ebe4] border border-[#E0E5CF] rounded-3xl max-w-xl w-full p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+            {/* Header */}
+            <div className="flex items-center justify-between pb-4 border-b border-[#E0E5CF]">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center">
+                  <GitMerge className="w-5 h-5 text-indigo-700" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-black text-[#00441F]">Cenários da Negociação</h2>
+                  <p className="text-xs text-[#00441F]/70 font-medium">
+                    {cenariosModalNegocio.leads?.nome || 'Cliente'} • {cenariosModalNegocio.titulo}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCenariosModalNegocio(null)}
+                className="p-1.5 rounded-xl hover:bg-black/5 text-[#00441F]/70 hover:text-[#00441F] transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-4">
+              {/* KPIs do Negócio Unificado */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                <div className="bg-white p-3 rounded-xl border border-[#E0E5CF]">
+                  <div className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                    Valor no Pipeline
+                  </div>
+                  <div className="text-sm font-black text-[#00441F] mt-0.5">
+                    {formatCurrency(cenariosModalNegocio.credito)}
+                  </div>
+                </div>
+
+                {cenariosModalNegocio.valor_medio && (
+                  <div className="bg-white p-3 rounded-xl border border-[#E0E5CF]">
+                    <div className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                      Média Original
+                    </div>
+                    <div className="text-sm font-black text-amber-700 mt-0.5">
+                      {formatCurrency(cenariosModalNegocio.valor_medio)}
+                    </div>
+                  </div>
+                )}
+
+                <div className="bg-white p-3 rounded-xl border border-[#E0E5CF]">
+                  <div className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                    Etapa Atual
+                  </div>
+                  <div className="text-xs font-black text-[#00441F] mt-1">
+                    {getEtapaLabel(cenariosModalNegocio.etapa_funil)}
+                  </div>
+                </div>
+
+                {cenariosModalNegocio.valor_fechamento && (
+                  <div className="bg-emerald-50 p-3 rounded-xl border border-emerald-300 col-span-2 sm:col-span-3">
+                    <div className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider">
+                      Valor Final de Fechamento Contratado
+                    </div>
+                    <div className="text-base font-black text-emerald-900 mt-0.5">
+                      {formatCurrency(cenariosModalNegocio.valor_fechamento)}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Lista dos Cenários */}
+              <div>
+                <h3 className="text-xs font-black text-[#00441F] uppercase tracking-wider mb-2">
+                  Propostas Consolidadas ({cenariosModalNegocio.propostas_unificadas?.length || 0} opções)
+                </h3>
+
+                <div className="space-y-2">
+                  {cenariosModalNegocio.propostas_unificadas && cenariosModalNegocio.propostas_unificadas.length > 0 ? (
+                    cenariosModalNegocio.propostas_unificadas.map((item, idx) => {
+                      const isVencedor =
+                        cenariosModalNegocio.proposta_fechada_id === item.proposta_id ||
+                        (cenariosModalNegocio.valor_fechamento &&
+                          Number(cenariosModalNegocio.valor_fechamento) === Number(item.credito));
+
+                      return (
+                        <div
+                          key={idx}
+                          className={`p-3 rounded-xl border flex items-center justify-between gap-3 ${
+                            isVencedor
+                              ? 'bg-emerald-50 border-emerald-400'
+                              : 'bg-white border-[#E0E5CF]'
+                          }`}
+                        >
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-extrabold text-xs text-[#00441F]">
+                                {item.titulo || `Cenário ${idx + 1}`}
+                              </span>
+                              {isVencedor && (
+                                <span className="text-[10px] font-black bg-emerald-600 text-white px-2 py-0.5 rounded-full">
+                                  Vencedora / Fechada
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-[11px] text-[#00441F]/70 flex items-center gap-2 mt-0.5">
+                              <span className="uppercase font-semibold">{item.modalidade}</span>
+                              {item.administradora && <span>• {item.administradora}</span>}
+                              {item.etapa_funil && <span>• {getEtapaLabel(item.etapa_funil)}</span>}
+                            </div>
+                          </div>
+
+                          <div className="text-right shrink-0 flex flex-col items-end gap-1">
+                            <span className="font-black text-sm text-[#00441F]">
+                              {formatCurrency(Number(item.credito))}
+                            </span>
+                            {item.proposta_id && (
+                              <Link
+                                href={`/propostas/${item.proposta_id}`}
+                                className="text-[10px] font-bold text-indigo-700 hover:underline"
+                              >
+                                Ver Proposta →
+                              </Link>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="p-4 rounded-xl bg-white border border-[#E0E5CF] text-center text-xs text-gray-500">
+                      Nenhum histórico detalhado de propostas registrado.
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Rodapé */}
+              <div className="pt-3 border-t border-[#E0E5CF] flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setCenariosModalNegocio(null)}
+                  className="px-5 py-2 rounded-xl bg-[#00441F] text-white text-xs font-bold hover:bg-[#00CF7B] transition-colors cursor-pointer"
+                >
+                  Fechar
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

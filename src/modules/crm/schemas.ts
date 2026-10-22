@@ -94,3 +94,17 @@ export const appendObservationSchema = z.object({
   leadId: leadIdSchema,
   novaObservacao: z.string().trim().min(1, 'A observação não pode ser vazia.').max(5000, 'Observação muito longa.'),
 });
+
+export const unificarNegociosSchema = z.object({
+  clienteId: leadIdSchema,
+  negocioIds: z.array(negocioIdSchema).min(2, 'Selecione pelo menos 2 propostas para unificar.'),
+  valorDefinido: z.number().min(0, 'Valor inválido.').optional(),
+  tituloPersonalizado: z.string().trim().max(255).optional(),
+});
+
+export const fecharNegocioUnificadoSchema = z.object({
+  negocioId: negocioIdSchema,
+  valorFinal: z.number().min(0, 'Valor final inválido.'),
+  propostaFechadaId: z.string().uuid('ID de proposta inválido.').nullable().optional(),
+});
+

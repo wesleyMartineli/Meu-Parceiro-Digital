@@ -546,15 +546,20 @@ export type Database = {
           empresa_id: string
           etapa_funil: string
           id: string
+          is_unificado: boolean | null
           modalidade: string
           motivo_perda: string | null
           origem: string | null
+          proposta_fechada_id: string | null
           proposta_id: string | null
+          propostas_unificadas: any | null
           proximo_followup: string | null
           temperatura: string | null
           titulo: string
           ultima_interacao: string | null
           updated_at: string
+          valor_fechamento: number | null
+          valor_medio: number | null
           vendedor_id: string | null
         }
         Insert: {
@@ -565,15 +570,20 @@ export type Database = {
           empresa_id: string
           etapa_funil?: string
           id?: string
+          is_unificado?: boolean | null
           modalidade: string
           motivo_perda?: string | null
           origem?: string | null
+          proposta_fechada_id?: string | null
           proposta_id?: string | null
+          propostas_unificadas?: any | null
           proximo_followup?: string | null
           temperatura?: string | null
           titulo: string
           ultima_interacao?: string | null
           updated_at?: string
+          valor_fechamento?: number | null
+          valor_medio?: number | null
           vendedor_id?: string | null
         }
         Update: {
@@ -584,15 +594,20 @@ export type Database = {
           empresa_id?: string
           etapa_funil?: string
           id?: string
+          is_unificado?: boolean | null
           modalidade?: string
           motivo_perda?: string | null
           origem?: string | null
+          proposta_fechada_id?: string | null
           proposta_id?: string | null
+          propostas_unificadas?: any | null
           proximo_followup?: string | null
           temperatura?: string | null
           titulo?: string
           ultima_interacao?: string | null
           updated_at?: string
+          valor_fechamento?: number | null
+          valor_medio?: number | null
           vendedor_id?: string | null
         }
         Relationships: [

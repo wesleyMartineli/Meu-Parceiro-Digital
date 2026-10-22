@@ -306,6 +306,7 @@ export default function MultiCotasClient({ leads, administradoras, empresa, usua
       lanceOfertadoPercentual: resultadoConsolidado?.percentualLanceMedio || 0,
       parcelaInicial: resultadoConsolidado?.totalParcelaInicial || 0,
       parcelaPosContemplacao: resultadoConsolidado?.totalParcelaFinal || 0,
+      parcelaFinal: resultadoConsolidado?.totalParcelaFinal || 0,
       totalFinal: resultadoConsolidado?.totalFinalPago || 0,
       taxaAdmin: cotas[0]?.taxaAdm || 0, // Baseado na primeira cota
       fundoReserva: cotas[0]?.fundoReserva || 0,

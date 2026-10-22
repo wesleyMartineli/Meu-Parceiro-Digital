@@ -1095,6 +1095,8 @@ export default function SimuladorClient({
       lanceOfertadoPercentual: resultadoExibicao?.percentualLance || 0,
       parcelaInicial: resultadoExibicao?.parcelaInicial || 0,
       parcelaPosContemplacao: resultadoExibicao?.parcelaFinal || 0,
+      parcelaPosContemplacaoInicial: resultadoExibicao?.parcelaPosContemplacaoInicial,
+      parcelaFinal: resultadoExibicao?.parcelaFinal || 0,
       parcelaPosAdesao: resultadoExibicao?.parcelaPosAdesao,
       prazoTaxaAdesao: prazoTaxaAdesao,
       totalFinal: resultadoExibicao?.totalPago || 0,

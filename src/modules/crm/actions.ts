@@ -10,7 +10,9 @@ import {
   createNegocioManualSchema,
   leadIdSchema,
   negocioIdSchema,
+  fecharNegocioUnificadoSchema,
   toggleFollowupStatusSchema,
+  unificarNegociosSchema,
   updateLeadSchema,
   updateNegocioStageSchema,
   updateParceiroStageSchema,
@@ -1123,5 +1125,199 @@ export async function logAssistantRecommendationAction(payload: {
     return { success: false, message: 'Erro ao registrar interação' };
   }
 }
+
+/**
+ * Unifica múltiplos negócios/propostas de um mesmo parceiro/cliente em um único negócio consolidado.
+ * Se os valores forem divergentes, calcula automaticamente a média das propostas.
+ */
+export async function unificarNegociosAction(payload: {
+  clienteId: string;
+  negocioIds: string[];
+  valorDefinido?: number;
+  tituloPersonalizado?: string;
+}): Promise<CRMActionState & { negocioUnificadoId?: string }> {
+  try {
+    const user = await getCurrentUser();
+    if (!user) {
+      return { success: false, message: 'Usuário não autenticado.' };
+    }
+
+    const parsed = unificarNegociosSchema.safeParse(payload);
+    if (!parsed.success) {
+      return { success: false, message: parsed.error.issues[0].message };
+    }
+
+    const { clienteId, negocioIds, valorDefinido, tituloPersonalizado } = parsed.data;
+    const supabase = await createClient();
+
+    // 1. Busca os negócios selecionados para validar que pertencem ao mesmo cliente
+    const { data: negocios, error: fetchErr } = await (supabase.from('negocios_crm') as any)
+      .select('id, cliente_id, proposta_id, titulo, credito, modalidade, administradora, etapa_funil, created_at')
+      .in('id', negocioIds)
+      .eq('cliente_id', clienteId);
+
+    if (fetchErr || !negocios || negocios.length < 2) {
+      return { success: false, message: 'Não foi possível encontrar as propostas selecionadas para este parceiro.' };
+    }
+
+    // 2. Busca dados do parceiro/lead
+    const { data: leadData } = await (supabase.from('leads') as any)
+      .select('nome')
+      .eq('id', clienteId)
+      .maybeSingle();
+
+    const nomeLead = leadData?.nome || 'Cliente';
+
+    // 3. Cálculo de média ou valor definido
+    const valores = negocios.map((n: any) => Number(n.credito || 0));
+    const media = Math.round(valores.reduce((acc: number, val: number) => acc + val, 0) / valores.length);
+    const valorConsolidado = valorDefinido !== undefined && valorDefinido > 0 ? valorDefinido : media;
+
+    // Etapas ordenadas por avanço
+    const hierarquiaEtapas = [
+      'oportunidades',
+      'simulacao_criada',
+      'proposta_enviada',
+      'negociacao',
+      'pre_fechamento',
+      'fechado_ganho',
+      'perdido',
+    ];
+    let melhorEtapa = 'simulacao_criada';
+    let melhorIndex = -1;
+    for (const neg of negocios) {
+      const idx = hierarquiaEtapas.indexOf(neg.etapa_funil);
+      if (idx > melhorIndex && neg.etapa_funil !== 'perdido') {
+        melhorIndex = idx;
+        melhorEtapa = neg.etapa_funil;
+      }
+    }
+
+    // Monta o snapshot das propostas unificadas
+    const propostasUnificadas = negocios.map((n: any) => ({
+      negocio_id: n.id,
+      proposta_id: n.proposta_id,
+      titulo: n.titulo,
+      credito: Number(n.credito || 0),
+      modalidade: n.modalidade,
+      administradora: n.administradora,
+      etapa_funil: n.etapa_funil,
+      created_at: n.created_at,
+    }));
+
+    const tituloFinal =
+      tituloPersonalizado?.trim() ||
+      `${nomeLead} - Negociação Unificada (${negocios.length} cenários) - R$ ${valorConsolidado.toLocaleString('pt-BR')}`;
+
+    // Elegemos o primeiro negócio como principal (priorizando o que já tem proposta_id)
+    const sortedNegocios = [...negocios].sort((a: any, b: any) => (b.proposta_id ? 1 : 0) - (a.proposta_id ? 1 : 0));
+    const primaryNegocio = sortedNegocios[0];
+    const subsumedIds = sortedNegocios.slice(1).map((n: any) => n.id);
+
+    // 4. Atualiza o negócio principal
+    const { error: updateErr } = await (supabase.from('negocios_crm') as any)
+      .update({
+        titulo: tituloFinal,
+        credito: valorConsolidado,
+        valor_medio: media,
+        is_unificado: true,
+        propostas_unificadas: propostasUnificadas,
+        etapa_funil: melhorEtapa,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', primaryNegocio.id);
+
+    if (updateErr) {
+      console.error('Erro ao atualizar negócio unificado:', updateErr);
+      return { success: false, message: 'Erro ao consolidar negócio unificado.' };
+    }
+
+    // 5. Aponta as propostas dos negócios secundários para o negócio principal
+    if (subsumedIds.length > 0) {
+      await (supabase.from('propostas') as any)
+        .update({ negocio_id: primaryNegocio.id })
+        .in('negocio_id', subsumedIds);
+
+      // Remove os negócios secundários para não inflar o pipeline
+      await (supabase.from('negocios_crm') as any)
+        .delete()
+        .in('id', subsumedIds);
+    }
+
+    revalidatePath('/crm');
+    revalidatePath('/dashboard');
+    revalidatePath('/relatorios');
+    revalidatePath('/propostas');
+
+    return {
+      success: true,
+      message: `Propostas unificadas com sucesso! Valor consolidado: R$ ${valorConsolidado.toLocaleString('pt-BR')}`,
+      negocioUnificadoId: primaryNegocio.id,
+    };
+  } catch (err: any) {
+    console.error('Erro interno ao unificar negócios:', err);
+    return { success: false, message: `Erro interno: ${err?.message || 'Erro desconhecido'}` };
+  }
+}
+
+/**
+ * Fecha um negócio unificado permitindo escolher o valor exato final fechado
+ * (seja o valor original de uma das propostas ou a média).
+ */
+export async function fecharNegocioUnificadoAction(payload: {
+  negocioId: string;
+  valorFinal: number;
+  propostaFechadaId?: string | null;
+}): Promise<CRMActionState> {
+  try {
+    const user = await getCurrentUser();
+    if (!user) {
+      return { success: false, message: 'Usuário não autenticado.' };
+    }
+
+    const parsed = fecharNegocioUnificadoSchema.safeParse(payload);
+    if (!parsed.success) {
+      return { success: false, message: parsed.error.issues[0].message };
+    }
+
+    const { negocioId, valorFinal, propostaFechadaId } = parsed.data;
+    const supabase = await createClient();
+
+    const { error: updateErr } = await (supabase.from('negocios_crm') as any)
+      .update({
+        etapa_funil: 'fechado_ganho',
+        credito: valorFinal,
+        valor_fechamento: valorFinal,
+        proposta_fechada_id: propostaFechadaId || null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', negocioId);
+
+    if (updateErr) {
+      console.error('Erro ao fechar negócio unificado:', updateErr);
+      return { success: false, message: 'Erro ao registrar fechamento do negócio.' };
+    }
+
+    if (propostaFechadaId) {
+      await (supabase.from('propostas') as any)
+        .update({ status: 'aceita' })
+        .eq('id', propostaFechadaId);
+    }
+
+    revalidatePath('/crm');
+    revalidatePath('/dashboard');
+    revalidatePath('/relatorios');
+    revalidatePath('/propostas');
+
+    return {
+      success: true,
+      message: `Negócio fechado e registrado com sucesso em Fechado / Ganho por R$ ${valorFinal.toLocaleString('pt-BR')}!`,
+    };
+  } catch (err: any) {
+    console.error('Erro ao fechar negócio:', err);
+    return { success: false, message: `Erro interno: ${err?.message || 'Erro desconhecido'}` };
+  }
+}
+
 
 

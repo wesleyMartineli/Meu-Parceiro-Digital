@@ -108,6 +108,11 @@ export default async function CRMPage() {
       ultima_interacao,
       motivo_perda,
       vendedor_id,
+      is_unificado,
+      propostas_unificadas,
+      valor_medio,
+      valor_fechamento,
+      proposta_fechada_id,
       created_at,
       updated_at,
       leads!inner (

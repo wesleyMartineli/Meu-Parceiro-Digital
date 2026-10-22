@@ -424,7 +424,18 @@ export const PropostaPDFDocument = ({ data }: PropostaPDFDocumentProps) => {
                   <View style={{ ...page4Styles.card, width: '48%', paddingVertical: 15 }}>
                     <Text style={{ fontSize: 10, fontWeight: 'bold', marginBottom: 5 }}>PARCELA INICIAL</Text>
                     <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#00441F', marginBottom: 2 }}>{formatCurrency(data.parcelaInicial)}</Text>
-                    <Text style={{ fontSize: 8, color: '#585f6c' }}>Pós-Contemplação {formatCurrency(data.parcelaPosContemplacao)}</Text>
+                    {data.parcelaPosContemplacaoInicial ? (
+                      <View style={{ marginTop: 2 }}>
+                        <Text style={{ fontSize: 7, color: '#585f6c' }}>
+                          Pós (até {Math.ceil((data.prazo || 0) / 2)}x): <Text style={{ fontWeight: 'bold', color: '#00441F' }}>{formatCurrency(data.parcelaPosContemplacaoInicial)}</Text>
+                        </Text>
+                        <Text style={{ fontSize: 7, color: '#585f6c', marginTop: 1 }}>
+                          Pós ({Math.ceil((data.prazo || 0) / 2) + 1} a {data.prazo}x): <Text style={{ fontWeight: 'bold', color: '#00441F' }}>{formatCurrency(data.parcelaPosContemplacao || data.parcelaFinal)}</Text>
+                        </Text>
+                      </View>
+                    ) : (
+                      <Text style={{ fontSize: 8, color: '#585f6c' }}>Pós-Contemplação {formatCurrency(data.parcelaPosContemplacao || data.parcelaFinal)}</Text>
+                    )}
                   </View>
                 </View>
 
@@ -570,6 +581,63 @@ export const PropostaPDFDocument = ({ data }: PropostaPDFDocumentProps) => {
           </View>
         </View>
 
+        {/* PARCELAS PÓS-CONTEMPLAÇÃO */}
+        {data.modalidade !== 'pontual' && (
+          <View style={{ marginTop: 10 }}>
+            {data.parcelaPosContemplacaoInicial ? (
+              <View style={{ ...page4Styles.card, backgroundColor: '#f9fafb', borderColor: '#e5e7eb', marginBottom: 0, padding: 10 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, borderBottomWidth: 1, borderBottomColor: '#e5e7eb', paddingBottom: 4 }}>
+                  <Text style={{ fontSize: 9, fontWeight: 'bold', color: '#00441F', textTransform: 'uppercase' }}>
+                    Fluxo de Parcelas Pós-Contemplação (Modalidade Degrau)
+                  </Text>
+                  <Text style={{ fontSize: 8, color: '#585f6c' }}>
+                    Prazo Total: {data.prazo} meses
+                  </Text>
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <View style={{ width: '48%', backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e7e8ea', borderRadius: 6, padding: 8 }}>
+                    <Text style={{ fontSize: 8, color: '#585f6c', textTransform: 'uppercase', fontWeight: 'bold', marginBottom: 2 }}>
+                      Parcela até o mês {Math.ceil((data.prazo || 180) / 2)}
+                    </Text>
+                    <Text style={{ fontSize: 7, color: '#99a0af', marginBottom: 4 }}>
+                      1ª metade do prazo (com taxa adm.)
+                    </Text>
+                    <Text style={{ fontSize: 15, fontWeight: 'bold', color: '#00441F' }}>
+                      {formatCurrency(data.parcelaPosContemplacaoInicial)}
+                    </Text>
+                  </View>
+
+                  <View style={{ width: '48%', backgroundColor: '#E0E5CF', borderWidth: 1, borderColor: '#c5d0a1', borderRadius: 6, padding: 8 }}>
+                    <Text style={{ fontSize: 8, color: '#00441F', textTransform: 'uppercase', fontWeight: 'bold', marginBottom: 2 }}>
+                      Parcela de {Math.ceil((data.prazo || 180) / 2) + 1} até {data.prazo} meses
+                    </Text>
+                    <Text style={{ fontSize: 7, color: '#585f6c', marginBottom: 4 }}>
+                      2ª metade do prazo (sem taxa adm.)
+                    </Text>
+                    <Text style={{ fontSize: 15, fontWeight: 'bold', color: '#00441F' }}>
+                      {formatCurrency(data.parcelaPosContemplacao || data.parcelaFinal)}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            ) : (
+              <View style={{ ...page4Styles.card, backgroundColor: '#f9fafb', borderColor: '#e5e7eb', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 0, paddingVertical: 10, paddingHorizontal: 12 }}>
+                <View>
+                  <Text style={{ fontSize: 9, fontWeight: 'bold', color: '#00441F', textTransform: 'uppercase' }}>
+                    Parcela Pós-Contemplação (Modalidade Linear)
+                  </Text>
+                  <Text style={{ fontSize: 7.5, color: '#585f6c', marginTop: 2 }}>
+                    Fluxo constante linear até a quitação final ({data.prazo} meses)
+                  </Text>
+                </View>
+                <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#00441F' }}>
+                  {formatCurrency(data.parcelaPosContemplacao || data.parcelaFinal)}
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
+
         <View style={{ borderLeftWidth: 4, borderLeftColor: cPrimaria, paddingLeft: 15, backgroundColor: '#E0E5CF', padding: 12, borderRadius: 5, marginTop: 10 }}>
           <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#00441F', marginBottom: 4 }}>RECOMENDAÇÃO ESTRATÉGICA</Text>
           <Text style={[styles.textBody, { fontSize: 9, textAlign: 'left' }]}>
@@ -597,7 +665,7 @@ export const PropostaPDFDocument = ({ data }: PropostaPDFDocumentProps) => {
           </View>
         ) : null}
 
-        <Text style={{ fontSize: 12, fontWeight: 'bold', color: '#00441F', marginTop: data.parcelasFuro && data.parcelasFuro > 0 ? 12 : 22, marginBottom: 12 }}>IMPACTO NA CONTEMPLAÇÃO</Text>
+        <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#00441F', marginTop: 10, marginBottom: 8 }}>IMPACTO NA CONTEMPLAÇÃO</Text>
         {(() => {
           let probabilidade = data.chancesOferta;
           const percentual = data.lanceOfertadoPercentual || 0;
@@ -710,7 +778,18 @@ export const PropostaPDFDocument = ({ data }: PropostaPDFDocumentProps) => {
             <View style={{ width: '48%', borderLeftWidth: 1, borderLeftColor: '#d9dadc', paddingLeft: 15 }}>
               <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#585f6c', marginBottom: 5 }}>PARCELA INICIAL</Text>
               <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#00441F' }}>{formatCurrency(data.parcelaInicial)}</Text>
-              <Text style={{ fontSize: 8, color: '#99a0af', marginTop: 2 }}>Pós-Contemplação: {formatCurrency(data.parcelaPosContemplacao)}</Text>
+              {data.parcelaPosContemplacaoInicial ? (
+                <View style={{ marginTop: 2 }}>
+                  <Text style={{ fontSize: 7.5, color: '#585f6c' }}>
+                    Pós (até {Math.ceil((data.prazo || 0) / 2)}x): <Text style={{ fontWeight: 'bold', color: '#00441F' }}>{formatCurrency(data.parcelaPosContemplacaoInicial)}</Text>
+                  </Text>
+                  <Text style={{ fontSize: 7.5, color: '#585f6c', marginTop: 1 }}>
+                    Pós ({Math.ceil((data.prazo || 0) / 2) + 1} a {data.prazo}x): <Text style={{ fontWeight: 'bold', color: '#00441F' }}>{formatCurrency(data.parcelaPosContemplacao || data.parcelaFinal)}</Text>
+                  </Text>
+                </View>
+              ) : (
+                <Text style={{ fontSize: 8, color: '#99a0af', marginTop: 2 }}>Pós-Contemplação: {formatCurrency(data.parcelaPosContemplacao || data.parcelaFinal)}</Text>
+              )}
 
               {data.parcelaPosAdesao ? (
                 <View style={{ marginTop: 10 }}>
