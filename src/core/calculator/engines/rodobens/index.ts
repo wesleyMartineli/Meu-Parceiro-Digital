@@ -125,30 +125,32 @@ export function calcularCotaRodobens(input: SimulacaoInput): CotaResult {
   const meioPrazo = Math.ceil(prazo / 2);
   const TA_dobrada = (credito * (taxaAdm / 100)) / meioPrazo;
 
-  // Rastrear diferenças acumuladas antes da contemplação
+  let fatorModalidade = 1.0;
+  if (modalidade === 'linear_70' || modalidade === 'degrau_70') {
+    fatorModalidade = 0.70;
+  } else if (modalidade === 'reducao_50' || modalidade === 'degrau_50') {
+    fatorModalidade = 0.50;
+  } else if (modalidade === 'reduzida') {
+    fatorModalidade = (input.percentualReducao || 70) / 100;
+  }
+
+  // Rastrear diferenças acumuladas no período com benefício de parcela reduzida (até contemplação ou meio prazo)
+  const mesFimReducao = Math.min(efetivoMesContemplacao, meioPrazo);
   let diferencaAcumuladaFC = 0;
   let diferencaAcumuladaTA = 0;
 
-  for (let mes = 1; mes <= Math.min(efetivoMesContemplacao, prazo); mes++) {
+  for (let mes = 1; mes <= mesFimReducao; mes++) {
     const FC_cheio = FC_plano;
-    const TA_cheio = isDegrau ? (mes <= meioPrazo ? TA_dobrada : 0) : TA_plano_linear;
+    const TA_cheio = isDegrau ? TA_dobrada : TA_plano_linear;
 
-    let FC_pago = FC_cheio;
-    let TA_pago = TA_cheio;
+    const FC_pago = FC_cheio * fatorModalidade;
+    const TA_pago = TA_cheio * fatorModalidade;
 
-    if (modalidade === 'linear_70' || modalidade === 'degrau_70') {
-      FC_pago = FC_cheio * 0.7;
-      TA_pago = TA_cheio * 0.7;
-      diferencaAcumuladaFC += (FC_cheio - FC_pago);
-      diferencaAcumuladaTA += (TA_cheio - TA_pago);
-    } else if (modalidade === 'reducao_50' || modalidade === 'degrau_50') {
-      FC_pago = FC_cheio * 0.5;
-      TA_pago = TA_cheio * 0.5;
-      diferencaAcumuladaFC += (FC_cheio - FC_pago);
-      diferencaAcumuladaTA += (TA_cheio - TA_pago);
-    }
+    diferencaAcumuladaFC += (FC_cheio - FC_pago);
+    diferencaAcumuladaTA += (TA_cheio - TA_pago);
   }
 
+  // Meses restantes a partir da contemplação para diluir a diferença acumulada e pagar parcela cheia
   const mesesRestantes = Math.max(prazo - efetivoMesContemplacao, 0);
   const recupFC = mesesRestantes > 0 ? (diferencaAcumuladaFC / mesesRestantes) : 0;
   const recupTA = mesesRestantes > 0 ? (diferencaAcumuladaTA / mesesRestantes) : 0;
@@ -219,28 +221,15 @@ export function calcularCotaRodobens(input: SimulacaoInput): CotaResult {
 
   // 1. Meses até a contemplação
   for (let mes = 1; mes <= efetivoMesContemplacao; mes++) {
-    const FC_cheio = FC_plano;
-    const TA_cheio = isDegrau ? (mes <= meioPrazo ? TA_dobrada : 0) : TA_plano_linear;
-    const FR_cheio = FR_plano_linear;
-    const SE_cheio = SE_plano_linear;
+    const dentroDoBeneficioReduzido = mes <= mesFimReducao;
+    const fatorMes = dentroDoBeneficioReduzido ? fatorModalidade : 1.0;
 
-    let FC_efetiva = FC_cheio;
-    let TA_efetiva = TA_cheio;
-    let FR_efetiva = FR_cheio;
-    let SE_efetiva = SE_cheio;
+    const FC_efetiva = (FC_plano * fatorMes) + adicionalFuroDiluido;
+    const TA_base = isDegrau ? (mes <= meioPrazo ? TA_dobrada : 0) : TA_plano_linear;
+    const TA_efetiva = TA_base * fatorMes;
+    const FR_efetiva = FR_plano_linear;
+    const SE_efetiva = SE_plano_linear;
     let adiantamento = 0;
-
-    if (modalidade === 'linear_70' || modalidade === 'degrau_70') {
-      FC_efetiva = FC_cheio * 0.7;
-      TA_efetiva = TA_cheio * 0.7;
-    } else if (modalidade === 'reducao_50' || modalidade === 'degrau_50') {
-      FC_efetiva = FC_cheio * 0.5;
-      TA_efetiva = TA_cheio * 0.5;
-    }
-
-    if (input.diluirFuro && furoReais > 0) {
-      FC_efetiva += (furoReais / prazo);
-    }
 
     if (modalidade === 'pontual' && mes === pontualMesAquicao) {
       adiantamento = valorAdiantamentoPontual;
