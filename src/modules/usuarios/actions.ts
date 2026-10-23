@@ -104,12 +104,40 @@ export async function createUserAction(
       };
     }
 
+    // Resolve empresa_id: do form, do supervisor, do admin ou da primeira empresa cadastrada
+    let resolvedEmpresaId = (formData.get('empresa_id') as string) || null;
+    if (!resolvedEmpresaId && targetSupervisorId) {
+      const { data: supData } = await adminClient
+        .from('usuarios')
+        .select('empresa_id')
+        .eq('id', targetSupervisorId)
+        .maybeSingle();
+      if (supData?.empresa_id) {
+        resolvedEmpresaId = supData.empresa_id;
+      }
+    }
+    if (!resolvedEmpresaId) {
+      resolvedEmpresaId = admin.empresa_id || null;
+    }
+    if (!resolvedEmpresaId) {
+      const { data: fallbackEmpresa } = await adminClient
+        .from('empresas')
+        .select('id')
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      if (fallbackEmpresa?.id) {
+        resolvedEmpresaId = fallbackEmpresa.id;
+      }
+    }
+
     // 2. Update their profile in public.usuarios
     const { error: updateError } = await adminClient
       .from('usuarios')
       .update({
         role: targetRole,
         supervisor_id: targetRole === 'master' ? null : targetSupervisorId,
+        empresa_id: resolvedEmpresaId,
       })
       .eq('id', authData.user.id);
 

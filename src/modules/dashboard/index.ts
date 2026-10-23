@@ -1,0 +1,12 @@
+export * from "./types";
+export * from "./analyticsEngine";
+export { default as DashboardEstrategico } from "./components/DashboardEstrategico";
+export { default as AnalysisCard } from "./components/AnalysisCard";
+export { default as CommercialKpiCards } from "./components/CommercialKpiCards";
+export { default as AnalysisViewer } from "./components/AnalysisViewer";
+export { default as AnalysisBuilderModal } from "./components/AnalysisBuilderModal";
+export { default as DrilldownDrawer } from "./components/DrilldownDrawer";
+export { default as DashboardHeaderBar } from "./components/DashboardHeaderBar";
+export { default as LaboratorioComparativo } from "./components/LaboratorioComparativo";
+export { default as MatrizParceiros } from "./components/MatrizParceiros";
+export { default as QuadroEquipe } from "./components/QuadroEquipe";

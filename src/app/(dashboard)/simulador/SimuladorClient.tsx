@@ -686,6 +686,9 @@ export default function SimuladorClient({
       creditoLiquido,
       parcelaInicial: resultado.parcelaInicial * factor,
       parcelaFinal: resultado.parcelaFinal * factor,
+      parcelaPosContemplacaoInicial: resultado.parcelaPosContemplacaoInicial !== undefined ? Number((resultado.parcelaPosContemplacaoInicial * factor).toFixed(2)) : undefined,
+      parcelaFinalNormal: resultado.parcelaFinalNormal !== undefined ? Number((resultado.parcelaFinalNormal * factor).toFixed(2)) : undefined,
+      parcelaPosAdesao: resultado.parcelaPosAdesao !== undefined ? Number((resultado.parcelaPosAdesao * factor).toFixed(2)) : undefined,
       lanceEmbutidoReais: resultado.lanceEmbutidoReais * factor,
       recursosPropriosReais,
       lanceTotalReais: resultado.lanceTotalReais * factor,
@@ -1082,6 +1085,8 @@ export default function SimuladorClient({
       produto: produto,
       modalidade: modalidade,
       prazo: prazo,
+      prazoEfetivo: resultadoExibicao?.prazoEfetivo,
+      mesesReduzidos: resultadoExibicao?.mesesReduzidos,
       prazoMaxGrupo: isRodobensPDF ? prazoMaxGrupo : undefined,
       parcelasFuro: isRodobensPDF ? parcelasFuro : undefined,
       diluirFuro: isRodobensPDF ? diluirFuro : undefined,
@@ -1726,8 +1731,7 @@ const leadObj = leads?.find((l) => l.id === leadId);
                       subtitle="Defina o formato e valores do lance"
                     />
 
-                {isRodobens && (
-
+                {isRodobens && (modalidade === "degrau_70" || modalidade === "degrau_50" || modalidade === "linear_70" || modalidade === "reducao_50" || modalidade === "reduzida") && (
                   <div className="mb-4">
                     <label className="block text-[10px] font-semibold text-[#002E17] uppercase tracking-wider mb-2">
                       Base de Cálculo do Lance
@@ -1745,7 +1749,7 @@ const leadObj = leads?.find((l) => l.id === leadId);
                         onClick={() => setBaseCalculoLance("reduzida")}
                         className={`flex-1 py-2 text-[11px] font-bold rounded-lg border transition-all ${baseCalculoLance === "reduzida" ? "bg-[#00CF7B] text-white border-[#00CF7B]" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}
                       >
-                        Parcela Reduzida (70%)
+                        Parcela Reduzida ({modalidade === "degrau_50" || modalidade === "reducao_50" ? "50%" : (modalidade === "reduzida" ? `${reducaoCustomizada}%` : "70%")})
                       </button>
                     </div>
                   </div>
@@ -2369,21 +2373,37 @@ const leadObj = leads?.find((l) => l.id === leadId);
                           resultadoExibicao.parcelaPosContemplacaoInicial ? (
                             <div className="space-y-3 pt-1 md:col-span-2">
                               <div className="flex justify-between items-center border-b border-white/5 pb-2">
-                                <span className="text-[11px] font-semibold opacity-80 text-gray-300">Parcela Pós-Contemplação (até {Math.ceil(prazo / 2)})</span>
+                                <span className="text-[11px] font-semibold opacity-80 text-gray-300">
+                                  Parcela Pós-Contemplação (até {Math.min(Math.ceil(prazo / 2), resultadoExibicao.prazoEfetivo || prazo)})
+                                </span>
                                 <span className="text-[13px] md:text-base font-extrabold text-[#FF9025]">
                                   {formatPropostaCurrency(resultadoExibicao.parcelaPosContemplacaoInicial)}
                                 </span>
                               </div>
                               <div className="flex justify-between items-center">
-                                <span className="text-[11px] font-semibold opacity-80 text-gray-300">Parcela de {Math.ceil(prazo / 2) + 1} até {prazo}</span>
+                                <span className="text-[11px] font-semibold opacity-80 text-gray-300">
+                                  Parcela de {Math.ceil(prazo / 2) + 1} até {resultadoExibicao.prazoEfetivo || prazo}
+                                </span>
                                 <span className="text-[13px] md:text-base font-extrabold text-[#FF9025]">
                                   {formatPropostaCurrency(resultadoExibicao.parcelaFinal)}
                                 </span>
                               </div>
+                              {abatimento === 'prazo' && resultadoExibicao.mesesReduzidos && resultadoExibicao.mesesReduzidos > 0 && (
+                                <div className="text-[10px] text-[#00CF7B] font-bold text-right pt-0.5">
+                                  Prazo reduzido para {resultadoExibicao.prazoEfetivo} meses (-{resultadoExibicao.mesesReduzidos}x)
+                                </div>
+                              )}
                             </div>
                           ) : (
                             <div className="flex justify-between items-center pt-1 md:col-span-2">
-                              <span className="text-xs font-semibold opacity-80 text-gray-300">Parcela Pós-Contemplação</span>
+                              <div className="flex flex-col">
+                                <span className="text-xs font-semibold opacity-80 text-gray-300">Parcela Pós-Contemplação</span>
+                                {abatimento === 'prazo' && resultadoExibicao.mesesReduzidos && resultadoExibicao.mesesReduzidos > 0 && (
+                                  <span className="text-[10px] text-[#00CF7B] font-bold">
+                                    Prazo reduzido para {resultadoExibicao.prazoEfetivo} meses (-{resultadoExibicao.mesesReduzidos}x)
+                                  </span>
+                                )}
+                              </div>
                               <span className="text-base font-extrabold text-[#FF9025]">
                                 {formatPropostaCurrency(resultadoExibicao.parcelaFinal)}
                               </span>
@@ -2588,21 +2608,37 @@ const leadObj = leads?.find((l) => l.id === leadId);
                             resultadoExibicao.parcelaPosContemplacaoInicial ? (
                               <div className="space-y-3 pt-1 col-span-2">
                                 <div className="flex justify-between items-center border-b border-white/5 pb-2">
-                                  <span className="text-[11px] font-semibold opacity-80 text-gray-300">Parcela Pós-Contemplação (até {Math.ceil(prazo / 2)})</span>
+                                  <span className="text-[11px] font-semibold opacity-80 text-gray-300">
+                                    Parcela Pós-Contemplação (até {Math.min(Math.ceil(prazo / 2), resultadoExibicao.prazoEfetivo || prazo)})
+                                  </span>
                                   <span className="text-base font-extrabold text-[#FF9025]">
                                     {formatPropostaCurrency(resultadoExibicao.parcelaPosContemplacaoInicial)}
                                   </span>
                                 </div>
                                 <div className="flex justify-between items-center">
-                                  <span className="text-[11px] font-semibold opacity-80 text-gray-300">Parcela de {Math.ceil(prazo / 2) + 1} até {prazo}</span>
+                                  <span className="text-[11px] font-semibold opacity-80 text-gray-300">
+                                    Parcela de {Math.ceil(prazo / 2) + 1} até {resultadoExibicao.prazoEfetivo || prazo}
+                                  </span>
                                   <span className="text-base font-extrabold text-[#FF9025]">
                                     {formatPropostaCurrency(resultadoExibicao.parcelaFinal)}
                                   </span>
                                 </div>
+                                {abatimento === 'prazo' && resultadoExibicao.mesesReduzidos && resultadoExibicao.mesesReduzidos > 0 && (
+                                  <div className="text-[10px] text-[#00CF7B] font-bold text-right pt-0.5">
+                                    Prazo reduzido para {resultadoExibicao.prazoEfetivo} meses (-{resultadoExibicao.mesesReduzidos}x)
+                                  </div>
+                                )}
                               </div>
                             ) : (
                               <div className="flex justify-between items-center pt-1 col-span-2">
-                                <span className="text-xs font-semibold opacity-80 text-gray-300">Parcela Pós-Contemplação</span>
+                                <div className="flex flex-col">
+                                  <span className="text-xs font-semibold opacity-80 text-gray-300">Parcela Pós-Contemplação</span>
+                                  {abatimento === 'prazo' && resultadoExibicao.mesesReduzidos && resultadoExibicao.mesesReduzidos > 0 && (
+                                    <span className="text-[10px] text-[#00CF7B] font-bold">
+                                      Prazo reduzido para {resultadoExibicao.prazoEfetivo} meses (-{resultadoExibicao.mesesReduzidos}x)
+                                    </span>
+                                  )}
+                                </div>
                                 <span className="text-base font-extrabold text-[#FF9025]">
                                   {formatPropostaCurrency(resultadoExibicao.parcelaFinal)}
                                 </span>

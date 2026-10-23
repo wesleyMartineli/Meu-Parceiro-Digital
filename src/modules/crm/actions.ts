@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
-import { getCurrentUser } from '@/lib/supabase/helpers';
+import { getCurrentUser, getActiveCompany } from '@/lib/supabase/helpers';
 import {
   appendObservationSchema,
   createFollowupSchema,
@@ -88,7 +88,7 @@ export async function createLeadAction(
       etapaFunil: formData.get('etapa_funil') as string,
       origem: formData.get('origem') as string,
       observacoes: formData.get('observacoes') as string,
-      gerenteId: formData.get('ponto_venda_id') as string,
+      gerenteId: (formData.get('gerente_id') || formData.get('vendedor_id') || formData.get('ponto_venda_id')) as string,
       tipoParceiro: formData.get('tipo_parceiro') as string,
       codigoPv: formData.get('codigo_pv') as string,
       nomeResponsavel: formData.get('nome_responsavel') as string,
@@ -140,15 +140,10 @@ export async function createLeadAction(
     }
 
     if (!resolvedEmpresaId) {
-      // Fallback para usuários de teste sem empresa definida
-      const { data: fallbackCompany } = await supabase
-        .from('empresas')
-        .select('id')
-        .limit(1)
-        .maybeSingle();
-        
-      if (fallbackCompany?.id) {
-        resolvedEmpresaId = fallbackCompany.id;
+      // Fallback para inquilino ativo
+      const activeCompany = await getActiveCompany();
+      if (activeCompany?.id) {
+        resolvedEmpresaId = activeCompany.id;
       }
     }
 
@@ -249,7 +244,7 @@ export async function updateLeadAction(
       email: formData.get('email') as string,
       origem: formData.get('origem') as string,
       observacoes: formData.get('observacoes') as string,
-      gerenteId: formData.get('ponto_venda_id') as string,
+      gerenteId: (formData.get('gerente_id') || formData.get('vendedor_id') || formData.get('ponto_venda_id')) as string,
       tipoParceiro: formData.get('tipo_parceiro') as string,
       codigoPv: formData.get('codigo_pv') as string,
       nomeResponsavel: formData.get('nome_responsavel') as string,
@@ -278,15 +273,17 @@ export async function updateLeadAction(
       estado: estado || null,
     };
 
-    // Only allow changing ponto_venda if gerente or platform admin
-    if (user.role === 'superintendente' || user.role === 'master') {
+    // Only allow changing ponto_venda / gerente if gerente, superintendente or platform admin
+    if (user.role === 'superintendente' || user.role === 'master' || user.role === 'platform_admin') {
       if (gerenteId && user.id) {
         const ponto_vendaValido = await ponto_vendaPertenceAEmpresa(supabase, gerenteId, user.id);
         if (!ponto_vendaValido) {
           return { success: false, message: 'Gerente de Negócios selecionado é inválido.' };
         }
       }
-      updatePayload.ponto_venda_id = gerenteId || null;
+      if (gerenteId) {
+        updatePayload.vendedor_id = gerenteId;
+      }
     }
 
     let query = (supabase as any)

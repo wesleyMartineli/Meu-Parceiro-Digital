@@ -55,7 +55,8 @@ export interface CotaResult {
   totalPago: number;
   cronograma: CronogramaParcela[];
   saldoLiquido?: number;
-  taxaAmSobSaldoLiquido?: number;
+  prazoEfetivo?: number;
+  mesesReduzidos?: number;
   adiantamento?: number;
   parcelasAntecipadas?: number;
 }

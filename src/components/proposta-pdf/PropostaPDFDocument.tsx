@@ -427,10 +427,10 @@ export const PropostaPDFDocument = ({ data }: PropostaPDFDocumentProps) => {
                     {data.parcelaPosContemplacaoInicial ? (
                       <View style={{ marginTop: 2 }}>
                         <Text style={{ fontSize: 7, color: '#585f6c' }}>
-                          Pós (até {Math.ceil((data.prazo || 0) / 2)}x): <Text style={{ fontWeight: 'bold', color: '#00441F' }}>{formatCurrency(data.parcelaPosContemplacaoInicial)}</Text>
+                          Pós (até {Math.min(Math.ceil((data.prazo || 0) / 2), data.prazoEfetivo || data.prazo || 0)}x): <Text style={{ fontWeight: 'bold', color: '#00441F' }}>{formatCurrency(data.parcelaPosContemplacaoInicial)}</Text>
                         </Text>
                         <Text style={{ fontSize: 7, color: '#585f6c', marginTop: 1 }}>
-                          Pós ({Math.ceil((data.prazo || 0) / 2) + 1} a {data.prazo}x): <Text style={{ fontWeight: 'bold', color: '#00441F' }}>{formatCurrency(data.parcelaPosContemplacao || data.parcelaFinal)}</Text>
+                          Pós ({Math.ceil((data.prazo || 0) / 2) + 1} a {data.prazoEfetivo || data.prazo}x): <Text style={{ fontWeight: 'bold', color: '#00441F' }}>{formatCurrency(data.parcelaPosContemplacao || data.parcelaFinal)}</Text>
                         </Text>
                       </View>
                     ) : (
@@ -591,13 +591,13 @@ export const PropostaPDFDocument = ({ data }: PropostaPDFDocumentProps) => {
                     Fluxo de Parcelas Pós-Contemplação (Modalidade Degrau)
                   </Text>
                   <Text style={{ fontSize: 8, color: '#585f6c' }}>
-                    Prazo Total: {data.prazo} meses
+                    Prazo Total: {data.prazoEfetivo && data.prazoEfetivo < (data.prazo || 0) ? `${data.prazoEfetivo} meses (-${(data.prazo || 0) - data.prazoEfetivo}x)` : `${data.prazo} meses`}
                   </Text>
                 </View>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                   <View style={{ width: '48%', backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e7e8ea', borderRadius: 6, padding: 8 }}>
                     <Text style={{ fontSize: 8, color: '#585f6c', textTransform: 'uppercase', fontWeight: 'bold', marginBottom: 2 }}>
-                      Parcela até o mês {Math.ceil((data.prazo || 180) / 2)}
+                      Parcela até o mês {Math.min(Math.ceil((data.prazo || 180) / 2), data.prazoEfetivo || data.prazo || 180)}
                     </Text>
                     <Text style={{ fontSize: 7, color: '#99a0af', marginBottom: 4 }}>
                       1ª metade do prazo (com taxa adm.)
@@ -609,7 +609,7 @@ export const PropostaPDFDocument = ({ data }: PropostaPDFDocumentProps) => {
 
                   <View style={{ width: '48%', backgroundColor: '#E0E5CF', borderWidth: 1, borderColor: '#c5d0a1', borderRadius: 6, padding: 8 }}>
                     <Text style={{ fontSize: 8, color: '#00441F', textTransform: 'uppercase', fontWeight: 'bold', marginBottom: 2 }}>
-                      Parcela de {Math.ceil((data.prazo || 180) / 2) + 1} até {data.prazo} meses
+                      Parcela de {Math.ceil((data.prazo || 180) / 2) + 1} até {data.prazoEfetivo || data.prazo} meses
                     </Text>
                     <Text style={{ fontSize: 7, color: '#585f6c', marginBottom: 4 }}>
                       2ª metade do prazo (sem taxa adm.)
@@ -781,10 +781,10 @@ export const PropostaPDFDocument = ({ data }: PropostaPDFDocumentProps) => {
               {data.parcelaPosContemplacaoInicial ? (
                 <View style={{ marginTop: 2 }}>
                   <Text style={{ fontSize: 7.5, color: '#585f6c' }}>
-                    Pós (até {Math.ceil((data.prazo || 0) / 2)}x): <Text style={{ fontWeight: 'bold', color: '#00441F' }}>{formatCurrency(data.parcelaPosContemplacaoInicial)}</Text>
+                    Pós (até {Math.min(Math.ceil((data.prazo || 0) / 2), data.prazoEfetivo || data.prazo || 0)}x): <Text style={{ fontWeight: 'bold', color: '#00441F' }}>{formatCurrency(data.parcelaPosContemplacaoInicial)}</Text>
                   </Text>
                   <Text style={{ fontSize: 7.5, color: '#585f6c', marginTop: 1 }}>
-                    Pós ({Math.ceil((data.prazo || 0) / 2) + 1} a {data.prazo}x): <Text style={{ fontWeight: 'bold', color: '#00441F' }}>{formatCurrency(data.parcelaPosContemplacao || data.parcelaFinal)}</Text>
+                    Pós ({Math.ceil((data.prazo || 0) / 2) + 1} a {data.prazoEfetivo || data.prazo}x): <Text style={{ fontWeight: 'bold', color: '#00441F' }}>{formatCurrency(data.parcelaPosContemplacao || data.parcelaFinal)}</Text>
                   </Text>
                 </View>
               ) : (

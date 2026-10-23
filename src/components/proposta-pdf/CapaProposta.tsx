@@ -35,6 +35,8 @@ export interface PropostaData {
   totalFinal?: number;
   taxaMensal?: number;
   prazo?: number;
+  prazoEfetivo?: number;
+  mesesReduzidos?: number;
   amortizacao?: string;
   chancesOferta?: string | number | null;
   isRodobens?: boolean;
